@@ -64,11 +64,21 @@ function handleRouteChange() {
   const path = getPath();
   const user = AuthProvider.currentUser;
 
+  // Routes gated by user role. Guests and waiters can only access
+  // /dashboard, /orders/new, and /receipts/:id (the receipt preview
+  // after a signature-gated sale). Anything else bounces to /dashboard.
+  const financialRoutes = ['/orders', '/reports'];
+  if (financialRoutes.includes(path)) {
+    if (!user || !user.canViewFinancials) {
+      window.location.hash = '/dashboard';
+      return;
+    }
+  }
+
   // Admin-only routes — guests and non-admins bounce to dashboard.
   const adminOnly = ['/menu', '/settings', '/settings/printer-setup'];
   if (adminOnly.some((p) => path === p || path.startsWith(p + '/'))) {
     if (!user || !user.isAdmin) {
-      // Soft redirect to dashboard; the app shell will show a toast.
       window.location.hash = '/dashboard';
       return;
     }

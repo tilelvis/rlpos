@@ -270,6 +270,7 @@ export function renderMenuManagement(content) {
       name: existing?.name ?? '',
       sortOrder: existing ? String(existing.sortOrder) : '1',
       color: existing?.colorValue ?? 0xff1976d2,
+      photoBase64: existing?.photoBase64 ?? null,
     };
     const palette = [
       0xff1976d2, 0xfffb8c00, 0xffc0392b, 0xff27ae60, 0xff8e44ad,
@@ -279,7 +280,82 @@ export function renderMenuManagement(content) {
     const body = h('div', {}, []);
     function refresh() {
       clear(body);
+
+      // --- Photo picker (image-first, 9:16 aspect like the dashboard card) ---
+      const photoBox = h('div', {
+        style: {
+          position: 'relative',
+          width: '100%',
+          aspectRatio: '9 / 16',
+          maxHeight: '200px',
+          margin: '0 auto 4px',
+          borderRadius: 'var(--radius-lg)',
+          overflow: 'hidden',
+          background: state.photoBase64
+            ? `url(${state.photoBase64}) center/cover`
+            : `${intToHex(state.color)}1f`,
+          border: '1px solid var(--divider)',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        },
+        onclick: async () => {
+          try {
+            const b64 = await pickPhoto(9 / 16);
+            if (b64) {
+              state.photoBase64 = b64;
+              refresh();
+            }
+          } catch (e) {
+            toast(`Photo pick failed: ${e.message}`, { type: 'error' });
+          }
+        },
+      }, [
+        !state.photoBase64
+          ? h('div', {
+              style: {
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '4px',
+                color: intToHex(state.color),
+              },
+            }, [
+              h('span', { class: 'icon material-symbols-outlined', style: { fontSize: '32px' } }, ['add_a_photo']),
+              h('span', { style: { fontSize: '12px', fontWeight: 600 } }, ['Add photo']),
+            ])
+          : null,
+        // Clear-photo button overlay (top-right)
+        state.photoBase64
+          ? h('button', {
+              class: 'btn btn--icon btn--text',
+              style: {
+                position: 'absolute',
+                top: '4px',
+                right: '4px',
+                background: 'rgba(0,0,0,0.55)',
+                color: '#fff',
+                borderRadius: '50%',
+                width: '28px',
+                height: '28px',
+                minHeight: '28px',
+                padding: '0',
+              },
+              onclick: (e) => {
+                e.stopPropagation();
+                state.photoBase64 = null;
+                refresh();
+              },
+            }, [h('span', { class: 'icon material-symbols-outlined', style: { fontSize: '16px' } }, ['close'])])
+          : null,
+      ]);
+
       body.append(
+        photoBox,
+        h('div', { style: { textAlign: 'center', color: 'var(--muted)', fontSize: '12px', marginBottom: '12px' } }, [
+          state.photoBase64 ? 'Tap the photo to change it. Recommended: 9:16 portrait image.' : 'Tap to add a 9:16 portrait photo (used on the dashboard category card).',
+        ]),
         h('div', { class: 'field' }, [
           h('label', {}, ['Name']),
           h('input', {
@@ -295,7 +371,7 @@ export function renderMenuManagement(content) {
           }),
         ]),
         h('div', { class: 'field' }, [
-          h('label', {}, ['Colour']),
+          h('label', {}, ['Colour (used as fallback tint when no photo is set)']),
           h('div', { style: { display: 'flex', gap: '6px', flexWrap: 'wrap' } },
             palette.map((c) =>
               h('div', {
@@ -335,6 +411,7 @@ export function renderMenuManagement(content) {
             name,
             sortOrder: parseInt(state.sortOrder, 10) || 1,
             colorValue: state.color,
+            photoBase64: state.photoBase64,
           });
           await MenuProvider.upsertCategory(c);
           toast(`Category ${existing ? 'updated' : 'created'}.`, { type: 'success' });
@@ -419,7 +496,15 @@ export function renderMenuManagement(content) {
 
 // ---- Helpers ----
 
-async function pickPhoto() {
+/**
+ * Pick a photo from disk and crop it to the given aspect ratio.
+ * Default is 1:1 (square, for menu item thumbnails). Pass 9/16 for
+ * portrait category images.
+ *
+ * @param {number} [aspectRatio=1] - width / height (1 = square, 9/16 = portrait)
+ * @returns {Promise<string|null>} data URL of the cropped JPEG, or null if cancelled
+ */
+async function pickPhoto(aspectRatio = 1) {
   return new Promise((resolve, reject) => {
     const input = h('input', { type: 'file', accept: 'image/*' });
     input.style.position = 'fixed';
@@ -433,16 +518,40 @@ async function pickPhoto() {
 
       try {
         const dataUrl = await readFileAsDataURL(file);
-        // Crop to a 400x400 square using canvas.
         const img = await loadImage(dataUrl);
-        const size = Math.min(img.width, img.height);
-        const sx = (img.width - size) / 2;
-        const sy = (img.height - size) / 2;
+
+        // Compute the crop window for the requested aspect ratio,
+        // centered on the image's middle.
+        const imgAspect = img.width / img.height;
+        let sx = 0, sy = 0, sw = img.width, sh = img.height;
+        if (imgAspect > aspectRatio) {
+          // Image is wider than target — crop horizontally.
+          sw = img.height * aspectRatio;
+          sx = (img.width - sw) / 2;
+        } else {
+          // Image is taller than target — crop vertically.
+          sh = img.width / aspectRatio;
+          sy = (img.height - sh) / 2;
+        }
+
+        // Render at a reasonable resolution — for a 9:16 portrait
+        // category image, 540x960 keeps file size manageable while
+        // looking crisp on retina screens.
+        const targetW = aspectRatio >= 1 ? 480 : Math.round(480 * aspectRatio);
+        const targetH = aspectRatio >= 1 ? Math.round(480 / aspectRatio) : 480;
+        // Override: for 9/16, use 540x960 explicitly.
+        let outW = targetW, outH = targetH;
+        if (Math.abs(aspectRatio - 9 / 16) < 0.01) {
+          outW = 540; outH = 960;
+        } else if (Math.abs(aspectRatio - 1) < 0.01) {
+          outW = 400; outH = 400;
+        }
+
         const canvas = document.createElement('canvas');
-        canvas.width = 400;
-        canvas.height = 400;
+        canvas.width = outW;
+        canvas.height = outH;
         const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, sx, sy, size, size, 0, 0, 400, 400);
+        ctx.drawImage(img, sx, sy, sw, sh, 0, 0, outW, outH);
         resolve(canvas.toDataURL('image/jpeg', 0.85));
       } catch (e) {
         reject(e);

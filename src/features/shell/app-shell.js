@@ -36,10 +36,17 @@ const VIEW_TITLES = {
   'settings': 'Settings',
 };
 
+// Bottom-nav items. `requires` filters who sees what:
+//   - 'isAdmin'           → admin only
+//   - 'canViewFinancials' → admin + cashier (not guests, not waiters)
+// Guests and waiters see ONLY Dashboard + New Sale — they have nothing
+// to do with order history or financial reports, so the bottom nav is
+// stripped down for them.
 const NAV_ITEMS = [
   { view: 'dashboard', label: 'Dashboard', icon: 'dashboard' },
-  { view: 'orders', label: 'Orders', icon: 'history' },
-  { view: 'reports', label: 'Reports', icon: 'bar_chart' },
+  { view: 'new-order', label: 'New Sale', icon: 'point_of_sale' },
+  { view: 'orders', label: 'Orders', icon: 'history', requires: 'canViewFinancials' },
+  { view: 'reports', label: 'Reports', icon: 'bar_chart', requires: 'canViewFinancials' },
   { view: 'menu', label: 'Menu', icon: 'restaurant', requires: 'isAdmin' },
   { view: 'settings', label: 'Settings', icon: 'settings', requires: 'isAdmin' },
 ];
@@ -154,16 +161,15 @@ function drawBottomNav(bottomnav) {
   clear(bottomnav);
   const user = AuthProvider.currentUser;
 
-  // Waiters see "My Orders" instead of "Orders".
+  // Filter nav items by role. Guests and waiters see ONLY Dashboard +
+  // New Sale (they have nothing to do with order history or reports).
+  // Admin/cashier additionally see Orders + Reports. Admin only
+  // additionally sees Menu + Settings.
   const items = NAV_ITEMS.filter((item) => {
     if (!item.requires) return true;
     if (item.requires === 'isAdmin') return user?.isAdmin ?? false;
+    if (item.requires === 'canViewFinancials') return user?.canViewFinancials ?? false;
     return true;
-  }).map((item) => {
-    if (item.view === 'orders' && user && !user.canViewFinancials) {
-      return { ...item, label: 'My Orders' };
-    }
-    return item;
   });
 
   for (const item of items) {
@@ -172,6 +178,7 @@ function drawBottomNav(bottomnav) {
       onclick: () => {
         _state.view = item.view;
         const path = item.view === 'dashboard' ? '/dashboard'
+          : item.view === 'new-order' ? '/orders/new'
           : item.view === 'orders' ? '/orders'
           : item.view === 'reports' ? '/reports'
           : item.view === 'menu' ? '/menu'
