@@ -8,6 +8,16 @@ name: Build Windows Desktop App
 # `v1.0.0` to trigger it automatically. Either way, download the installer
 # from the workflow run's "Artifacts" section once it finishes (a few
 # minutes — most of that is a one-time Rust/Tauri CLI compile).
+#
+# Every run gets a unique UTC timestamp baked into both the artifact name
+# and the installer filenames themselves, so two different runs can never
+# collide or look identical in the Artifacts list or in your Downloads
+# folder. The Rust `target/` directory is deliberately NOT cached (see the
+# rust-cache step below) — only the crates.io registry is — so every run
+# does a full rebuild and bundle from your current checkout. That's the
+# fix for the "downloaded a previous build" problem: a cached target/
+# directory could let an old compiled binary or an old bundled
+# .msi/.exe survive into a run where the source had actually changed.
 
 on:
   workflow_dispatch:
@@ -22,6 +32,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Generate build timestamp
+        shell: pwsh
+        run: |
+          $stamp = Get-Date -Format "yyyyMMdd-HHmmss"
+          echo "BUILD_STAMP=$stamp" >> $env:GITHUB_ENV
+          Write-Host "Build stamp: $stamp"
 
       # Only runs for tag-triggered builds (v1.2.0 etc.) — a manual
       # "Run workflow" click leaves whatever's committed in package.json /
@@ -66,9 +83,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: "npm"
 
       - name: Install npm dependencies
-        run: npm install
+        run: npm ci
 
       # No separate "npm run build" step here on purpose: `cargo tauri
       # build` below runs it automatically via tauri.conf.json's
@@ -82,22 +100,61 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Cache Cargo registry & build output
+      # cache-targets: false is deliberate. The default behaviour caches
+      # src-tauri/target/ (both the compiled binary AND the bundled
+      # .msi/.exe) between runs. That's what let a stale installer slip
+      # through: on a cache hit, if the build/bundle step didn't fully
+      # regenerate the bundle output for some reason, the previous run's
+      # installer file could still be sitting there and get uploaded as
+      # if it were fresh. With cache-targets: false, only the downloaded
+      # crates (~/.cargo/registry) are cached — every run always compiles
+      # and bundles from scratch, at the cost of a few extra minutes.
+      - name: Cache Cargo registry (dependencies only — not build output)
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: "src-tauri -> target"
+          cache-targets: false
 
       - name: Install Tauri CLI
         run: cargo install tauri-cli --version "^2.0.0" --locked
+
+      # Belt-and-braces: guarantee the bundle folder is empty before we
+      # build, so it's structurally impossible for an old installer file
+      # to be sitting there and get picked up by the upload step below.
+      - name: Clean previous bundle output
+        shell: pwsh
+        run: |
+          Remove-Item -Recurse -Force src-tauri/target/release/bundle -ErrorAction SilentlyContinue
+          Write-Host "Bundle directory cleared."
 
       - name: Build Windows installer
         working-directory: src-tauri
         run: cargo tauri build
 
+      # Stamp the actual installer filenames too, not just the artifact
+      # name — so even after downloading, two builds never look
+      # identical or overwrite each other on your machine.
+      - name: Stamp installer filenames
+        shell: pwsh
+        run: |
+          $stamp = "${{ env.BUILD_STAMP }}"
+
+          Get-ChildItem -Path "src-tauri/target/release/bundle/msi/*.msi" -ErrorAction SilentlyContinue | ForEach-Object {
+            $newName = "$($_.BaseName)_$stamp$($_.Extension)"
+            Rename-Item -Path $_.FullName -NewName $newName
+            Write-Host "Renamed to $newName"
+          }
+
+          Get-ChildItem -Path "src-tauri/target/release/bundle/nsis/*.exe" -ErrorAction SilentlyContinue | ForEach-Object {
+            $newName = "$($_.BaseName)_$stamp$($_.Extension)"
+            Rename-Item -Path $_.FullName -NewName $newName
+            Write-Host "Renamed to $newName"
+          }
+
       - name: Upload installer artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: raicilabs-pos-windows-${{ env.APP_VERSION || 'dev' }}
+          name: raicilabs-pos-windows-${{ env.APP_VERSION || 'dev' }}-${{ env.BUILD_STAMP }}
           path: |
             src-tauri/target/release/bundle/msi/*.msi
             src-tauri/target/release/bundle/nsis/*.exe
