@@ -1,4 +1,16 @@
-// Order model + status enum (port of lib/core/models/order.dart).
+// Order model + status enum.
+//
+// An Order is a customer order in the POS lifecycle:
+//   open → held → completed → (paid=true)
+//   open → voided
+//
+// PAYMENT STATUS:
+// An order's `paid` flag is INDEPENDENT of its lifecycle status.
+// `status: completed` means "the order was finalised and a receipt
+// was printed". `paid: false` means "payment has NOT yet been
+// received by an admin/cashier" — the order is still outstanding.
+// Newly completed orders default to `paid=false`. An admin/cashier
+// marks them paid after physically receiving the cash / M-Pesa.
 
 import { OrderItem } from './order_item.js';
 
@@ -21,6 +33,10 @@ export class Order {
     completedAt = null,
     heldAt = null,
     note = null,
+    paid = false,
+    paidAt = null,
+    paidById = null,
+    paidByName = null,
   }) {
     this.id = id;
     this.orderNumber = orderNumber;
@@ -32,6 +48,10 @@ export class Order {
     this.completedAt = completedAt;
     this.heldAt = heldAt;
     this.note = note;
+    this.paid = paid;
+    this.paidAt = paidAt;
+    this.paidById = paidById;
+    this.paidByName = paidByName;
   }
 
   get total() {
@@ -46,9 +66,25 @@ export class Order {
     return ORDER_STATUS[this.status]?.label ?? this.status;
   }
 
+  /** True if the order is completed but payment has not yet been
+   *  received by an admin/cashier. */
+  get isUnpaid() {
+    return this.status === 'completed' && !this.paid;
+  }
+
   /** Returns a copy with any of the given fields overridden. The
    *  items array is preserved as-is (still OrderItem instances). */
-  copyWith({ items, status, completedAt, heldAt, note } = {}) {
+  copyWith({
+    items,
+    status,
+    completedAt,
+    heldAt,
+    note,
+    paid,
+    paidAt,
+    paidById,
+    paidByName,
+  } = {}) {
     return new Order({
       id: this.id,
       orderNumber: this.orderNumber,
@@ -60,6 +96,20 @@ export class Order {
       completedAt: completedAt ?? this.completedAt,
       heldAt: heldAt ?? this.heldAt,
       note: note ?? this.note,
+      paid: paid ?? this.paid,
+      paidAt: paidAt ?? this.paidAt,
+      paidById: paidById ?? this.paidById,
+      paidByName: paidByName ?? this.paidByName,
+    });
+  }
+
+  /** Mark this order as paid by the given user. Returns a new Order. */
+  markPaidBy(user) {
+    return this.copyWith({
+      paid: true,
+      paidAt: new Date().toISOString(),
+      paidById: user.id,
+      paidByName: user.displayName,
     });
   }
 
@@ -75,6 +125,10 @@ export class Order {
       completedAt: this.completedAt,
       heldAt: this.heldAt,
       note: this.note,
+      paid: this.paid,
+      paidAt: this.paidAt,
+      paidById: this.paidById,
+      paidByName: this.paidByName,
     };
   }
 
@@ -90,6 +144,14 @@ export class Order {
       completedAt: m.completedAt,
       heldAt: m.heldAt,
       note: m.note,
+      // Migration: orders saved before the `paid` field existed
+      // are treated as paid so historical receipts don't show as
+      // outstanding. Only newly completed orders (post-this-change)
+      // default to unpaid.
+      paid: m.paid ?? (m.status === 'completed'),
+      paidAt: m.paidAt ?? (m.status === 'completed' ? m.completedAt : null),
+      paidById: m.paidById ?? m.cashierId,
+      paidByName: m.paidByName ?? m.cashierName,
     });
   }
 }

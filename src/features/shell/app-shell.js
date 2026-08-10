@@ -1,51 +1,56 @@
-// App shell — top app bar + bottom nav (port of
-// lib/features/shell/app_shell.dart).
+// App shell — top app bar + bottom nav.
 //
-// Renders the chrome (header, nav) and swaps the inner content based on
-// the active view. Listens to store channels so it rebuilds when
-// auth / orders change.
+// GUEST MODE: the app starts in guest mode (no logged-in user). The
+// shell still renders — the dashboard, orders, and reports tabs are
+// visible to guests. Menu and Settings are admin-only and hidden.
+//
+// Admin/cashier who have logged in via the "Complete Sale" signature
+// flow stay signed in; they see Menu/Settings tabs and the floating
+// unpaid-orders notif. Waiters are auto-logged-out after their print,
+// so they revert to guest mode.
+//
+// Bottom nav (in order):
+//   Dashboard, Orders, Reports, [Menu (admin)], [Settings (admin)]
 
 import { h, clear, mount, toast } from '../../core/ui.js';
 import { AuthProvider } from '../../core/providers/auth.js';
 import { store, CHANNELS } from '../../core/store.js';
 import { navigate } from '../../core/router.js';
+import { OrdersProvider } from '../../core/providers/orders.js';
 import { PrinterService } from '../../core/services/printer_service.js';
 import { renderDashboard } from '../dashboard/dashboard.js';
 import { renderNewOrder } from '../orders/new-order.js';
 import { renderOrderHistory } from '../orders/order-history.js';
-import { renderReceiptHistory } from '../receipts/receipt-history.js';
 import { renderReports } from '../reports/reports.js';
 import { renderMenuManagement } from '../menu/menu-management.js';
 import { renderSettings } from '../settings/business-settings.js';
 import { showPrinterQuickAccessDialog } from '../printer/usb-printer-widget.js';
+import { renderUnpaidNotif, refreshUnpaidNotif } from '../orders/unpaid-notif.js';
 
 const VIEW_TITLES = {
   'new-order': 'New Sale',
   'dashboard': 'Dashboard',
-  'receipts': 'Receipts',
-  'orders': 'Order Log',
+  'orders': 'Orders',
   'reports': 'Reports',
   'menu': 'Menu',
   'settings': 'Settings',
 };
 
 const NAV_ITEMS = [
-  { view: 'new-order', label: 'New Sale', icon: 'point_of_sale' },
-  { view: 'dashboard', label: 'Dashboard', icon: 'dashboard', requires: 'canViewFinancials' },
-  { view: 'receipts', label: 'Receipts', icon: 'receipt_long', requires: 'canViewFinancials' },
-  { view: 'orders', label: 'Order Log', icon: 'history' },
-  { view: 'reports', label: 'Reports', icon: 'bar_chart', requires: 'canViewFinancials' },
+  { view: 'dashboard', label: 'Dashboard', icon: 'dashboard' },
+  { view: 'orders', label: 'Orders', icon: 'history' },
+  { view: 'reports', label: 'Reports', icon: 'bar_chart' },
   { view: 'menu', label: 'Menu', icon: 'restaurant', requires: 'isAdmin' },
   { view: 'settings', label: 'Settings', icon: 'settings', requires: 'isAdmin' },
 ];
 
 let _state = {
-  view: 'new-order',
+  view: 'dashboard',
 };
 
 const _listeners = [];
 
-export function renderAppShell({ initialView = 'new-order' } = {}) {
+export function renderAppShell({ initialView = 'dashboard' } = {}) {
   _state.view = initialView;
 
   const root = h('div', { class: 'app-shell' }, []);
@@ -60,28 +65,26 @@ export function renderAppShell({ initialView = 'new-order' } = {}) {
     drawAppbar(appbar);
     drawBottomNav(bottomnav);
     drawContent(content);
+    refreshUnpaidNotif();
   }
 
   rerender();
 
-  // Re-render on relevant state changes.
   _listeners.push(store.subscribe(CHANNELS.auth, rerender));
   _listeners.push(store.subscribe(CHANNELS.menu, () => {
-    // Only re-render content if we're on the menu view.
-    if (_state.view === 'menu' || _state.view === 'new-order') drawContent(content);
+    if (_state.view === 'menu' || _state.view === 'new-order' || _state.view === 'dashboard') drawContent(content);
   }));
   _listeners.push(store.subscribe(CHANNELS.orders, () => {
     if (_state.view === 'orders' || _state.view === 'dashboard' || _state.view === 'reports') drawContent(content);
+    refreshUnpaidNotif();
   }));
   _listeners.push(store.subscribe(CHANNELS.receipts, () => {
-    if (_state.view === 'receipts' || _state.view === 'dashboard') drawContent(content);
+    if (_state.view === 'reports') drawContent(content);
   }));
   _listeners.push(store.subscribe(CHANNELS.cart, () => {
     if (_state.view === 'new-order') drawContent(content);
   }));
 
-  // External navigation requests (e.g. from the router when navigating
-  // between tabs).
   window.addEventListener('app:navigate', (e) => {
     const { view } = e.detail || {};
     if (view && view !== _state.view) {
@@ -92,56 +95,72 @@ export function renderAppShell({ initialView = 'new-order' } = {}) {
     }
   });
 
+  // Render the floating unpaid-orders notif (only shows for admin/cashier
+  // when there are unpaid orders).
+  renderUnpaidNotif();
+
   // Try silent USB printer reconnect on first build.
   if (PrinterService.usbSupported) {
-    PrinterService.tryReconnectUsb().catch(() => {});
+    import('../../core/services/printer_service.js').then(({ PrinterService }) => {
+      PrinterService.tryReconnectUsb().catch(() => {});
+    });
   }
 }
 
 function drawAppbar(appbar) {
   clear(appbar);
   const user = AuthProvider.currentUser;
-  if (!user) return;
-
   appbar.append(
     h('div', { class: 'appbar__title' }, [VIEW_TITLES[_state.view] || 'Raicilabs POS']),
-    // Printer quick-access icon
+  );
+
+  // Printer quick-access icon — visible to anyone (guests included),
+  // since a guest might need to pair a printer before their sale.
+  appbar.append(
     h('button', {
       class: 'btn btn--icon',
       title: 'Printer connection',
       'aria-label': 'Printer connection',
       onclick: () => showPrinterQuickAccessDialog(),
     }, [h('span', { class: 'icon material-symbols-outlined' }, ['print'])]),
-    // User chip
-    h('div', { class: 'appbar__user-chip' }, [
-      `${user.displayName} · ${user.roleLabel}`,
-    ]),
-    // Sign out
-    h('button', {
-      class: 'btn btn--icon',
-      title: 'Sign out',
-      'aria-label': 'Sign out',
-      onclick: () => {
-        AuthProvider.signOut();
-        navigate('/login');
-      },
-    }, [h('span', { class: 'icon material-symbols-outlined' }, ['logout'])]),
   );
+
+  if (user) {
+    // Logged-in: show user chip + sign-out.
+    appbar.append(
+      h('div', { class: 'appbar__user-chip' }, [
+        `${user.displayName} · ${user.roleLabel}`,
+      ]),
+      h('button', {
+        class: 'btn btn--icon',
+        title: 'Sign out',
+        'aria-label': 'Sign out',
+        onclick: () => {
+          AuthProvider.signOut();
+          toast('Signed out.', { type: 'info' });
+          navigate('/dashboard');
+        },
+      }, [h('span', { class: 'icon material-symbols-outlined' }, ['logout'])]),
+    );
+  } else {
+    // Guest: show "Guest" chip; no sign-out button.
+    appbar.append(
+      h('div', { class: 'appbar__user-chip' }, ['Guest']),
+    );
+  }
 }
 
 function drawBottomNav(bottomnav) {
   clear(bottomnav);
   const user = AuthProvider.currentUser;
-  if (!user) return;
 
-  // Waiters see "My Orders" instead of "Order Log".
+  // Waiters see "My Orders" instead of "Orders".
   const items = NAV_ITEMS.filter((item) => {
     if (!item.requires) return true;
-    if (item.requires === 'isAdmin') return user.isAdmin;
-    if (item.requires === 'canViewFinancials') return user.canViewFinancials;
+    if (item.requires === 'isAdmin') return user?.isAdmin ?? false;
     return true;
   }).map((item) => {
-    if (item.view === 'orders' && !user.canViewFinancials) {
+    if (item.view === 'orders' && user && !user.canViewFinancials) {
       return { ...item, label: 'My Orders' };
     }
     return item;
@@ -152,11 +171,8 @@ function drawBottomNav(bottomnav) {
       class: `bottomnav__item ${_state.view === item.view ? 'active' : ''}`,
       onclick: () => {
         _state.view = item.view;
-        // Update URL hash so refresh keeps the view.
-        const path = item.view === 'new-order' ? '/orders/new'
-          : item.view === 'dashboard' ? '/dashboard'
+        const path = item.view === 'dashboard' ? '/dashboard'
           : item.view === 'orders' ? '/orders'
-          : item.view === 'receipts' ? '/receipts'
           : item.view === 'reports' ? '/reports'
           : item.view === 'menu' ? '/menu'
           : item.view === 'settings' ? '/settings'
@@ -185,9 +201,6 @@ function drawContent(content) {
       break;
     case 'orders':
       renderOrderHistory(content);
-      break;
-    case 'receipts':
-      renderReceiptHistory(content);
       break;
     case 'reports':
       renderReports(content);

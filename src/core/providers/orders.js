@@ -21,6 +21,32 @@ export const OrdersProvider = {
     return StorageService.orders.filter((o) => o.status === 'completed');
   },
 
+  /** Completed orders that haven't been paid for yet. Visible to
+   *  admin/cashier via the floating unpaid-orders notif. */
+  get unpaidOrders() {
+    return StorageService.orders.filter((o) => o.isUnpaid);
+  },
+
+  get unpaidCount() {
+    return this.unpaidOrders.length;
+  },
+
+  /** Count of completed orders raised by the given user today
+   *  (used for the waiter's "you raised X orders today" toast). */
+  countByUserToday(userId) {
+    const now = new Date();
+    return StorageService.orders.filter((o) => {
+      if (o.cashierId !== userId) return false;
+      if (o.status !== 'completed') return false;
+      const c = new Date(o.createdAt);
+      return (
+        c.getFullYear() === now.getFullYear() &&
+        c.getMonth() === now.getMonth() &&
+        c.getDate() === now.getDate()
+      );
+    }).length;
+  },
+
   /** Create a new open order from the current cart. Returns the created order. */
   async createFromCart(items, { note = null } = {}) {
     const user = Auth.user;
@@ -98,5 +124,19 @@ export const OrdersProvider = {
     const updated = o.copyWith({ status: 'voided' });
     await StorageService.upsertOrder(updated);
     store.bump(CHANNELS.orders);
+  },
+
+  /** Mark a completed order as paid. Only admin/cashier may call this
+   *  — the caller is responsible for ensuring the user is authorised
+   *  (the unpaid-orders modal checks `user.canViewFinancials` before
+   *  showing the "Mark paid" button). */
+  async markPaid(orderId, user) {
+    const o = StorageService.findOrder(orderId);
+    if (!o) return;
+    if (o.status !== 'completed') return;
+    const updated = o.markPaidBy(user);
+    await StorageService.upsertOrder(updated);
+    store.bump(CHANNELS.orders);
+    return updated;
   },
 };

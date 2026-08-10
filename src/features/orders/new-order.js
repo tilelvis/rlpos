@@ -4,14 +4,34 @@
 import { h, clear, toast, formatMoney } from '../../core/ui.js';
 import { MenuProvider, CartProvider } from '../../core/providers/menu.js';
 import { OrdersProvider } from '../../core/providers/orders.js';
+import { AuthProvider } from '../../core/providers/auth.js';
 import { store, CHANNELS } from '../../core/store.js';
-import { navigate } from '../../core/router.js';
+import { navigate, currentQuery } from '../../core/router.js';
+import { showLoginModal } from '../auth/login-modal.js';
+
+/**
+ * After a signature-gated action (complete sale, hold), waiters are
+ * auto-logged-out and bounced back to the dashboard. Admin/cashier
+ * stay signed in so they can manage unpaid orders. This is called
+ * from the post-print code path AND from any failed-action path so
+ * a waiter's transient login doesn't linger.
+ */
+function maybeAutoLogout(user) {
+  if (!user) return;
+  if (user.role === 'waiter') {
+    AuthProvider.signOut();
+    toast('Signed out.', { type: 'info', duration: 1500 });
+    navigate('/dashboard');
+  }
+}
 
 export function renderNewOrder(content) {
   clear(content);
 
-  // Local UI state (not persisted).
-  let _selectedCategoryId = null;
+  // Local UI state (not persisted). Pre-select category from URL query
+  // (e.g. /orders/new?cat=c-123) — used by the dashboard category grid.
+  const initialQuery = currentQuery();
+  let _selectedCategoryId = initialQuery.cat || null;
   let _searchQuery = '';
   let _completing = false;
 
@@ -177,29 +197,64 @@ export function renderNewOrder(content) {
     holdBtn.addEventListener('click', async () => {
       const items = CartProvider.items;
       if (items.length === 0) return;
+
+      // Holding an order also requires a signature (so we know whose
+      // order it is). Prompt login first.
+      let user = AuthProvider.currentUser;
+      if (!user) {
+        const signedIn = await showLoginModal({
+          title: 'Sign in to hold order',
+          subtitle: 'Your sign-in attaches your name to this held order so it can be resumed later.',
+        });
+        if (!signedIn) return; // user cancelled
+        user = signedIn;
+      }
       try {
         const order = await OrdersProvider.createFromCart(items);
         await OrdersProvider.holdOrder(order.id);
         toast(`Order ${order.orderNumber} held. Resume it from Orders.`, { type: 'success' });
+        // Waiters auto-logout after their action; admin/cashier stay.
+        maybeAutoLogout(user);
       } catch (e) {
         toast(`Failed to hold: ${e.message}`, { type: 'error' });
+        maybeAutoLogout(user);
       }
     });
 
     completeBtn.addEventListener('click', async () => {
       const items = CartProvider.items;
       if (items.length === 0) return;
+
+      // Complete Sale requires a signature. If the user is already
+      // logged in (e.g. an admin mid-session), use them. Otherwise
+      // pop the login modal as a signature step.
+      let user = AuthProvider.currentUser;
+      if (!user) {
+        const signedIn = await showLoginModal({
+          title: 'Sign in to complete sale',
+          subtitle: 'Your sign-in acts as a signature for this sale.',
+        });
+        if (!signedIn) return; // user cancelled — abort sale
+        user = signedIn;
+      }
+
       _completing = true;
       drawCartActions();
       try {
         const order = await OrdersProvider.createFromCart(items);
         const receipt = await OrdersProvider.completeOrder(order.id);
+        // Stash the user for the receipt-preview page to use after
+        // print (it needs to know whose signature to log out, and
+        // whether to show the "you raised X orders today" toast).
+        window.__lastSaleUser = user;
+        window.__lastSaleOrderId = order.id;
         toast(`Sale complete — Receipt #${receipt.receiptNumber}`, { type: 'success' });
         navigate(`/receipts/${receipt.id}`);
       } catch (e) {
         toast(`Failed to complete sale: ${e.message}`, { type: 'error' });
         _completing = false;
         drawCartActions();
+        maybeAutoLogout(user);
       }
     });
 

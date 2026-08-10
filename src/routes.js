@@ -5,12 +5,10 @@ import { registerRoute, navigate } from './core/router.js';
 import { AuthProvider } from './core/providers/auth.js';
 import { store, CHANNELS } from './core/store.js';
 
-import { renderLogin } from './features/auth/login.js';
 import { renderAppShell } from './features/shell/app-shell.js';
 import { renderDashboard } from './features/dashboard/dashboard.js';
 import { renderNewOrder } from './features/orders/new-order.js';
 import { renderOrderHistory } from './features/orders/order-history.js';
-import { renderReceiptHistory } from './features/receipts/receipt-history.js';
 import { renderReceiptPreview } from './features/receipts/receipt-preview.js';
 import { renderReports } from './features/reports/reports.js';
 import { renderMenuManagement } from './features/menu/menu-management.js';
@@ -18,42 +16,26 @@ import { renderSettings } from './features/settings/business-settings.js';
 import { renderPrinterSetup } from './features/printer/zadig-setup.js';
 
 // Each route handler accepts (params, path). The router already
-// redirected to /login if no user is signed in, so feature handlers
-// can assume AuthProvider.currentUser is non-null.
-
-let _shellMounted = false;
+// redirected to /dashboard if a guest tries an admin-only route.
 
 function ensureShellThen(view) {
-  // Check if the shell is actually still in the DOM — full-screen
-  // pages (printer setup, receipt preview) replace #app's content, so
-  // _shellMounted can be stale. Use the DOM as source of truth.
   const app = document.getElementById('app');
   const shellPresent = !!app && app.firstElementChild?.classList.contains('app-shell');
 
   if (!shellPresent) {
-    _shellMounted = true;
     renderAppShell({ initialView: view });
   } else {
-    _shellMounted = true;
     window.dispatchEvent(new CustomEvent('app:navigate', { detail: { view } }));
   }
 }
 
-// When user signs out, we need to reset the shell flag.
+// When user signs out, force a shell remount on next navigate.
 store.subscribe(CHANNELS.auth, () => {
-  if (!AuthProvider.currentUser) {
-    _shellMounted = false;
-  }
+  // No-op here — the shell listens to auth changes itself.
 });
 
 export function registerRoutes() {
-  // Login — standalone (no shell).
-  registerRoute('/login', () => {
-    _shellMounted = false;
-    renderLogin();
-  });
-
-  // Shell-wrapped views.
+  // Shell-wrapped views (all accessible in guest mode except admin-only).
   registerRoute('/dashboard', () => {
     ensureShellThen('dashboard');
   });
@@ -62,9 +44,6 @@ export function registerRoutes() {
   });
   registerRoute('/orders', () => {
     ensureShellThen('orders');
-  });
-  registerRoute('/receipts', () => {
-    ensureShellThen('receipts');
   });
   registerRoute('/reports', () => {
     ensureShellThen('reports');
@@ -85,13 +64,8 @@ export function registerRoutes() {
     renderReceiptPreview(params[0]);
   });
 
-  // Default landing — redirect happens in router.
+  // Default landing — always dashboard, regardless of role.
   registerRoute('/', () => {
-    const user = AuthProvider.currentUser;
-    if (user) {
-      navigate(user.isAdmin ? '/dashboard' : '/orders/new');
-    } else {
-      navigate('/login');
-    }
+    navigate('/dashboard');
   });
 }

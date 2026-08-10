@@ -1,17 +1,22 @@
 // Hash-based router. Keeps the app static-hostable (Vercel/Netlify/Pages)
 // without server-side route rewriting.
 //
+// GUEST MODE:
+// The app boots straight to the dashboard — no login screen at startup.
+// Guests can browse the dashboard, build a cart, and tap "Complete Sale".
+// At that point a login modal pops up as a signature step. After
+// successful print, waiters auto-logout (back to guest mode); admin/
+// cashier stay logged in so they can manage unpaid orders.
+//
 // Routes:
-//   #/login
 //   #/dashboard
 //   #/orders/new
 //   #/orders
-//   #/receipts
-//   #/receipts/:id
+//   #/receipts/:id            (full-screen receipt preview, no shell)
 //   #/reports
-//   #/menu
-//   #/settings
-//   #/settings/printer-setup    (WinUSB / Zadig walkthrough)
+//   #/menu                    (admin only — redirects to dashboard otherwise)
+//   #/settings                (admin only — redirects to dashboard otherwise)
+//   #/settings/printer-setup  (admin only)
 
 import { AuthProvider } from './providers/auth.js';
 
@@ -36,22 +41,37 @@ export function back() {
 
 function getPath() {
   const h = window.location.hash.replace(/^#/, '');
-  return h || '/';
+  // Strip query string for route matching, but keep it available
+  // via getQuery() for handlers that need it (e.g. /orders/new?cat=xxx).
+  return (h || '/').split('?')[0];
+}
+
+function getQuery() {
+  const h = window.location.hash.replace(/^#/, '');
+  const qIndex = h.indexOf('?');
+  if (qIndex < 0) return {};
+  const params = new URLSearchParams(h.slice(qIndex + 1));
+  const obj = {};
+  for (const [k, v] of params.entries()) obj[k] = v;
+  return obj;
+}
+
+export function currentQuery() {
+  return getQuery();
 }
 
 function handleRouteChange() {
   const path = getPath();
   const user = AuthProvider.currentUser;
 
-  // Auth gate: anything except #/login requires a signed-in user.
-  if (!user && path !== '/login') {
-    window.location.hash = '/login';
-    return;
-  }
-  if (user && path === '/login') {
-    // Already signed in — bounce to the default landing.
-    window.location.hash = user.isAdmin ? '/dashboard' : '/orders/new';
-    return;
+  // Admin-only routes — guests and non-admins bounce to dashboard.
+  const adminOnly = ['/menu', '/settings', '/settings/printer-setup'];
+  if (adminOnly.some((p) => path === p || path.startsWith(p + '/'))) {
+    if (!user || !user.isAdmin) {
+      // Soft redirect to dashboard; the app shell will show a toast.
+      window.location.hash = '/dashboard';
+      return;
+    }
   }
 
   for (const r of ROUTES) {
@@ -66,12 +86,8 @@ function handleRouteChange() {
     }
   }
 
-  // No match — fall back to home.
-  if (user) {
-    window.location.hash = user.isAdmin ? '/dashboard' : '/orders/new';
-  } else {
-    window.location.hash = '/login';
-  }
+  // No match — fall back to dashboard (works for guests and logged-in users).
+  window.location.hash = '/dashboard';
 }
 
 let _booted = false;

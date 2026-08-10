@@ -85,6 +85,13 @@ export function renderOrderHistory(content) {
               class: `tag tag--${o.status === 'completed' ? 'success' : o.status === 'held' ? 'purple' : o.status === 'voided' ? 'muted' : 'warning'}`,
               style: { marginLeft: '8px' },
             }, [o.statusLabel]),
+            // Show paid/unpaid badge on completed orders.
+            o.status === 'completed'
+              ? h('span', {
+                  class: `tag ${o.paid ? 'tag--paid' : 'tag--unpaid'}`,
+                  style: { marginLeft: '4px' },
+                }, [o.paid ? 'Paid' : 'Unpaid'])
+              : null,
           ]),
           h('div', { class: 'list-item__subtitle' }, [
             `${formatDate(o.createdAt)} · Taken by ${o.cashierName} · ${o.itemCount} items`,

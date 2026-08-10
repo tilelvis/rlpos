@@ -10,19 +10,26 @@ A Point-of-Sale system built with **vanilla HTML + ES modules + Vite**, packaged
 
 | Feature | Status |
 |---------|--------|
-| Login (admin / cashier / waiter roles) | ✅ |
-| New Sale — menu grid + cart + complete | ✅ |
+| **Guest mode** — app boots to dashboard, no login screen at startup | ✅ |
+| **Login-as-signature** — login modal pops up at "Complete Sale" as a signature step | ✅ |
+| **Auto-logout for waiters** — waiters auto-logout after print, back to guest mode | ✅ |
+| **Admin/cashier stay logged in** after signature login (to manage unpaid orders) | ✅ |
+| **Unpaid orders tracking** — orders marked unpaid by default; admin/cashier mark paid | ✅ |
+| **Floating unpaid-orders notif** at top — admin/cashier only, click to mark paid | ✅ |
+| **Dashboard with 3×n category grid** — tap a category to drill into items | ✅ |
+| **Receipts moved inside Reports** as a sub-tab (with per-receipt PDF export) | ✅ |
+| **PDF removed from receipt preview** — only USB + Browser print paths there | ✅ |
+| **Waiter's "You raised X orders today" disappearing toast** after print | ✅ |
+| New Sale (menu grid + cart + complete) | ✅ |
 | Receipt preview (58mm / 80mm, customer / kitchen copy toggle) | ✅ |
-| Three print paths: WebUSB direct ESC/POS, browser print dialog, PDF export | ✅ |
-| Dashboard (today's KPIs + recent orders) | ✅ |
-| Receipts history (with reprint counter) | ✅ |
-| Order Log (held / completed / voided) | ✅ |
-| Reports (daily sales chart, top items, top cashiers, Excel export) | ✅ |
+| Two print paths: WebUSB direct ESC/POS, browser print dialog (PDF export moved to Reports → Receipts) | ✅ |
+| Order Log (held / completed / voided) with Paid/Unpaid badges per order | ✅ |
+| Reports — Sales sub-tab (charts, Excel export) + Receipts sub-tab (PDF export) | ✅ |
 | Menu management (items + categories + photos + CSV import) | ✅ |
 | Settings: business profile, printer pairing, user management, system purge | ✅ |
 | **WinUSB / Zadig setup walkthrough** (Settings → Printer → Open Setup Guide) | ✅ |
 | PWA installable, offline-capable, manifest + service worker | ✅ |
-| localStorage persistence (mirrors the Flutter app's Hive box layout) | ✅ |
+| localStorage persistence | ✅ |
 
 ---
 
@@ -35,6 +42,29 @@ A Point-of-Sale system built with **vanilla HTML + ES modules + Vite**, packaged
 | Waiter | `mary` | `1234` |
 
 The cashier account can ring up sales; the admin account additionally sees the **Menu** and **Settings** tabs. The waiter can also ring up sales but only sees their own orders.
+
+---
+
+## Guest mode + login-as-signature flow
+
+The app has **no login screen at startup**. Instead:
+
+1. **App boots to dashboard in guest mode.** Anyone can browse categories, build a cart, and tap "Complete Sale".
+2. **Login pops up as a signature step at "Complete Sale".** The user must authenticate to authorise the sale — this acts as their signature.
+3. **After successful print:**
+   - **Waiters** are auto-logged-out → back to guest mode. A "You've raised X orders today" toast appears for ~4 seconds.
+   - **Admin/cashier** stay logged in so they can manage unpaid orders. They can sign out manually via the app bar.
+4. **Menu/Settings** are admin-only — guests who navigate to those routes are bounced back to the dashboard.
+
+This means a shared terminal can sit on the counter showing the dashboard. Staff walk up, build the order, sign in transiently to authorise the sale, and walk away — no lingering sessions.
+
+### Unpaid orders
+
+Every completed order defaults to `paid: false`. Payment is received separately by an admin/cashier (cash in the till, M-Pesa confirmation, etc.).
+
+- A floating red "Unpaid: N" chip appears at the top-right of every page **for admin/cashier only**, when N > 0.
+- Clicking the chip opens a modal listing all unpaid orders, each with a "Mark paid" button.
+- Paid orders show a green "Paid" tag; unpaid show a red "Unpaid" tag in the Orders list.
 
 ---
 

@@ -19,10 +19,12 @@ async function main() {
   // Seed default users / business profile on first run.
   await SeedService.ensureSeeded();
 
-  // Try restoring a previous session.
-  AuthProvider.restore();
+  // NOTE: we deliberately do NOT restore a previous session here.
+  // The app boots in guest mode (currentUser === null) — no login
+  // screen at startup. Login only happens via the "Complete Sale"
+  // signature flow. See README → "Guest mode + login-as-signature".
 
-  // Register all routes (login, dashboard, orders, etc.).
+  // Register all routes.
   registerRoutes();
 
   // Boot the router — this renders the first screen.

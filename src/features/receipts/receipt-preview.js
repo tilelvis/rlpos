@@ -3,14 +3,23 @@
 //
 // Shown immediately after "Complete Sale". Displays a pixel-accurate
 // monospaced preview of what will be printed — toggle between Customer
-// Copy and Business/Kitchen Copy. Every print action (USB, Browser,
-// PDF) prints/exports BOTH copies together.
+// Copy and Business/Kitchen Copy.
+//
+// Two print paths only (PDF export moved to Reports → Receipts):
+//   1. Direct WebUSB ESC/POS  — Chrome/Edge/Opera only, no OS driver
+//   2. Browser print dialog  — works everywhere
+//
+// After a successful print:
+//   - Waiters are auto-logged-out (signature flow complete) and shown
+//     a disappearing "You've raised X orders today" toast.
+//   - Admin/cashier stay signed in so they can manage unpaid orders.
 
 import { h, clear, mount, toast, formatMoney } from '../../core/ui.js';
 import { ReceiptsProvider } from '../../core/providers/receipts.js';
 import { ReceiptService } from '../../core/services/receipt_service.js';
 import { PrinterService } from '../../core/services/printer_service.js';
 import { StorageService } from '../../core/services/storage.js';
+import { OrdersProvider } from '../../core/providers/orders.js';
 import { store, CHANNELS } from '../../core/store.js';
 import { navigate } from '../../core/router.js';
 import { AuthProvider } from '../../core/providers/auth.js';
@@ -23,10 +32,17 @@ export function renderReceiptPreview(receiptId) {
     return;
   }
 
+  // The user who completed this sale — stashed by new-order.js before
+  // navigating here. Used to decide post-print behaviour (auto-logout
+  // for waiters, toast for waiters, stay-logged-in for admin/cashier).
+  const saleUser = window.__lastSaleUser || AuthProvider.currentUser;
+  const saleOrderId = window.__lastSaleOrderId || receipt.orderId;
+
   // Local UI state
   let _paper = receipt.paperWidth || 'mm58';
   let _previewCopy = 'customer';
   let _printing = false;
+  let _postPrintHandled = false;
 
   // Listen to USB state changes.
   let _usbConnected = PrinterService.usbConnected;
@@ -52,7 +68,6 @@ export function renderReceiptPreview(receiptId) {
   });
 
   const unsubReceipts = store.subscribe(CHANNELS.receipts, () => {
-    // Re-pull the receipt in case it was reprinted during this view.
     const refreshed = ReceiptsProvider.findById(receiptId);
     if (refreshed) drawPreview(refreshed);
   });
@@ -73,7 +88,7 @@ export function renderReceiptPreview(receiptId) {
       h('button', {
         class: 'btn btn--icon',
         'aria-label': 'Close',
-        onclick: () => navigate(AuthProvider.currentUser?.isAdmin ? '/dashboard' : '/orders/new'),
+        onclick: () => afterPrintCancel(),
       }, [h('span', { class: 'icon material-symbols-outlined' }, ['close'])]),
       h('div', { class: 'appbar__title' }, [`Receipt #${receipt.receiptNumber}`]),
       // Paper width toggle
@@ -102,10 +117,7 @@ export function renderReceiptPreview(receiptId) {
 
   function drawUsbBar() {
     clear(usbBar);
-    if (!PrinterService.usbSupported) {
-      // Don't show the bar at all in unsupported browsers.
-      return;
-    }
+    if (!PrinterService.usbSupported) return;
     if (_usbConnected) {
       usbBar.className = 'status-bar status-bar--info';
       usbBar.append(
@@ -193,92 +205,95 @@ export function renderReceiptPreview(receiptId) {
       ? receipt.copyWith({ paperWidth: _paper })
       : Object.assign(Object.create(Object.getPrototypeOf(receipt)), receipt, { paperWidth: _paper });
 
-    const pdfBtn = h('button', { class: 'btn btn--outlined', style: { flex: '1' } }, [
-      h('span', { class: 'icon material-symbols-outlined', style: { fontSize: '18px' } }, ['picture_as_pdf']),
-      'PDF',
-    ]);
-    pdfBtn.addEventListener('click', async () => {
-      if (_printing) return;
-      _printing = true;
-      drawActions();
-      try {
-        await PrinterService.exportPdfBothCopies(displayReceipt);
-      } catch (e) {
-        toast(`PDF export failed: ${e.message}`, { type: 'error' });
-      } finally {
-        _printing = false;
-        drawActions();
-      }
-    });
-
     const browserBtn = h('button', { class: 'btn btn--outlined', style: { flex: '1' } }, [
       h('span', { class: 'icon material-symbols-outlined', style: { fontSize: '18px' } }, ['print']),
       'Browser',
     ]);
-    browserBtn.addEventListener('click', async () => {
-      if (_printing) return;
-      _printing = true;
-      drawActions();
-      try {
-        const updated = displayReceipt;
-        await StorageService.upsertReceipt(updated);
-        await ReceiptsProvider.markReprinted(updated.id);
-        await PrinterService.printReceiptBothCopiesBrowser(updated);
-        // Close preview underneath the OS print dialog.
-        setTimeout(() => navigate(AuthProvider.currentUser?.isAdmin ? '/dashboard' : '/orders/new'), 600);
-      } catch (e) {
-        toast(`Print failed: ${e.message}`, { type: 'error' });
-        _printing = false;
-        drawActions();
-      }
-    });
+    browserBtn.addEventListener('click', () => doPrint('browser', displayReceipt));
 
     if (_usbConnected) {
       const usbBtn = h('button', { class: 'btn btn--filled', style: { flex: '2' } }, [
         _printing ? h('span', { class: 'spinner' }, []) : h('span', { class: 'icon material-symbols-outlined', style: { fontSize: '18px' } }, ['print']),
         _printing ? 'Printing…' : 'Print to USB',
       ]);
-      usbBtn.addEventListener('click', async () => {
-        if (_printing) return;
-        _printing = true;
-        drawActions();
-        try {
-          const updated = displayReceipt;
-          await StorageService.upsertReceipt(updated);
-          await ReceiptsProvider.markReprinted(updated.id);
-          await PrinterService.printReceiptUsbBothCopies(updated);
-          toast('Receipt printed via USB.', { type: 'success' });
-          navigate(AuthProvider.currentUser?.isAdmin ? '/dashboard' : '/orders/new');
-        } catch (e) {
-          toast(`USB print failed: ${e.message}`, { type: 'error' });
-          _printing = false;
-          drawActions();
-        }
-      });
-      actionBar.append(pdfBtn, browserBtn, usbBtn);
+      usbBtn.addEventListener('click', () => doPrint('usb', displayReceipt));
+      actionBar.append(browserBtn, usbBtn);
     } else {
       const bothBtn = h('button', { class: 'btn btn--filled', style: { flex: '2' } }, [
         _printing ? h('span', { class: 'spinner' }, []) : h('span', { class: 'icon material-symbols-outlined', style: { fontSize: '18px' } }, ['print']),
         _printing ? 'Printing…' : 'Print Both Copies',
       ]);
-      bothBtn.addEventListener('click', async () => {
-        if (_printing) return;
-        _printing = true;
-        drawActions();
-        try {
-          const updated = displayReceipt;
-          await StorageService.upsertReceipt(updated);
-          await ReceiptsProvider.markReprinted(updated.id);
-          await PrinterService.printReceiptBothCopiesBrowser(updated);
-          setTimeout(() => navigate(AuthProvider.currentUser?.isAdmin ? '/dashboard' : '/orders/new'), 600);
-        } catch (e) {
-          toast(`Print failed: ${e.message}`, { type: 'error' });
-          _printing = false;
-          drawActions();
-        }
-      });
-      actionBar.append(pdfBtn, bothBtn);
+      bothBtn.addEventListener('click', () => doPrint('browser', displayReceipt));
+      actionBar.append(browserBtn, bothBtn);
     }
+  }
+
+  async function doPrint(method, displayReceipt) {
+    if (_printing) return;
+    _printing = true;
+    drawActions();
+    try {
+      await StorageService.upsertReceipt(displayReceipt);
+      await ReceiptsProvider.markReprinted(displayReceipt.id);
+
+      // Schedule the post-print flow BEFORE calling print() — print()
+      // is synchronous and blocks the JS event loop until the print
+      // dialog closes (in real Chrome) or dismisses silently (in
+      // headless Chromium). Either way, we don't want the post-print
+      // navigation to depend on print() returning.
+      setTimeout(() => afterPrintSuccess(), 1500);
+
+      if (method === 'usb') {
+        await PrinterService.printReceiptUsbBothCopies(displayReceipt);
+        toast('Receipt printed via USB.', { type: 'success' });
+      } else {
+        await PrinterService.printReceiptBothCopiesBrowser(displayReceipt);
+      }
+    } catch (e) {
+      toast(`${method === 'usb' ? 'USB' : 'Browser'} print failed: ${e.message}`, { type: 'error' });
+      _printing = false;
+      drawActions();
+    }
+  }
+
+  /** Called after a successful print. Decides what to do based on the
+   *  sale user's role:
+   *    Waiter → auto-logout, show "X orders today" toast, navigate to dashboard.
+   *    Admin/Cashier → stay logged in, navigate to dashboard.
+   *    Guest (shouldn't happen — Complete Sale requires login) → just navigate. */
+  function afterPrintSuccess() {
+    if (_postPrintHandled) return;
+    _postPrintHandled = true;
+
+    if (saleUser && saleUser.role === 'waiter') {
+      // Waiter: count their completed orders today, show toast, logout.
+      const count = OrdersProvider.countByUserToday(saleUser.id);
+      const msg = count === 1
+        ? `You've raised 1 order today`
+        : `You've raised ${count} orders today`;
+      toast(msg, { type: 'success', duration: 4500 });
+      AuthProvider.signOut();
+      // Brief delay so the toast is visible before navigation.
+      setTimeout(() => navigate('/dashboard'), 600);
+      return;
+    }
+
+    // Admin/cashier: stay logged in, go to dashboard.
+    navigate('/dashboard');
+  }
+
+  /** Called when user dismisses the preview without printing (close button). */
+  function afterPrintCancel() {
+    // If a waiter signed in to complete the sale but then cancelled the
+    // print, still log them out (their signature was used to create the
+    // receipt — they don't get to stay logged in without printing).
+    if (saleUser && saleUser.role === 'waiter') {
+      AuthProvider.signOut();
+    }
+    // Clear the stashed sale context.
+    delete window.__lastSaleUser;
+    delete window.__lastSaleOrderId;
+    navigate('/dashboard');
   }
 
   // Initial draw

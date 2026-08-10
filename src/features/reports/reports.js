@@ -1,13 +1,72 @@
-// Reports page (port of lib/features/reports/reports_page.dart).
+// Reports page with two sub-tabs: Sales and Receipts.
+//
+// Sales: existing charts — daily sales (last 7 days), top items by
+//   revenue, sales by cashier, plus Excel export buttons.
+//
+// Receipts: list of all receipts (one per completed order) with
+//   per-receipt PDF export button. This is where PDF export lives now
+//   that the receipt preview window no longer has it — cashier can
+//   come back here later if they need a PDF copy of any receipt.
+//
+// Both sub-tabs are visible to admin/cashier only (the Reports tab
+// itself is admin/cashier-only in the bottom nav, so this is enforced
+// at the route level).
 
-import { h, clear, formatMoney0, toast, formatDate } from '../../core/ui.js';
+import { h, clear, formatMoney0, formatMoney, toast, formatDate } from '../../core/ui.js';
 import { OrdersProvider } from '../../core/providers/orders.js';
+import { ReceiptsProvider } from '../../core/providers/receipts.js';
 import { ReportService } from '../../core/services/report_service.js';
+import { PrinterService } from '../../core/services/printer_service.js';
 import { FileDownloadService } from '../../core/services/file_download.js';
+import { store, CHANNELS } from '../../core/store.js';
+import { navigate } from '../../core/router.js';
+
+let _subtab = 'sales'; // 'sales' | 'receipts'
 
 export function renderReports(content) {
   clear(content);
 
+  const root = h('div', { style: { display: 'flex', flexDirection: 'column', flex: '1', minHeight: '0' } }, []);
+  const subtabs = h('div', { class: 'subtabs' }, [
+    h('button', {
+      class: `subtab ${_subtab === 'sales' ? 'active' : ''}`,
+      onclick: () => { _subtab = 'sales'; draw(); },
+    }, ['Sales']),
+    h('button', {
+      class: `subtab ${_subtab === 'receipts' ? 'active' : ''}`,
+      onclick: () => { _subtab = 'receipts'; draw(); },
+    }, ['Receipts']),
+  ]);
+  const body = h('div', { class: 'tab-content' }, []);
+  root.append(subtabs, body);
+  content.append(root);
+
+  function draw() {
+    subtabs.querySelectorAll('.subtab').forEach((b, i) => {
+      b.classList.toggle('active', (_subtab === 'sales' && i === 0) || (_subtab === 'receipts' && i === 1));
+    });
+    clear(body);
+    if (_subtab === 'sales') drawSalesTab(body);
+    else drawReceiptsTab(body);
+  }
+
+  draw();
+
+  const unsub = store.subscribe(CHANNELS.orders, draw);
+  const unsubR = store.subscribe(CHANNELS.receipts, draw);
+  const obs = new MutationObserver(() => {
+    if (!content.contains(root)) {
+      unsub();
+      unsubR();
+      obs.disconnect();
+    }
+  });
+  obs.observe(content, { childList: true });
+}
+
+// ------------------ Sales sub-tab ------------------
+
+function drawSalesTab(body) {
   const completed = OrdersProvider.completedOrders;
   const totalRevenue = completed.reduce((s, o) => s + o.total, 0);
 
@@ -55,16 +114,12 @@ export function renderReports(content) {
     .map(([name, v]) => ({ name, ...v }))
     .sort((a, b) => b.revenue - a.revenue);
 
-  const root = h('div', { style: { padding: '16px', maxWidth: '900px', margin: '0 auto' } }, []);
-
   // ---- Download reports card ----
-  root.append(
+  body.append(
     h('div', { class: 'card' }, [
       h('h2', { class: 'section-title', style: { margin: '0 0 4px' } }, ['Download Reports']),
       h('p', { style: { color: 'var(--muted)', fontSize: '12px', marginTop: '0' } }, [
-        'Each report is an Excel file with sales, staff KPIs, and best sellers. ' +
-          'The admin is prompted to save the previous day\'s report at the start of each day; ' +
-          'a copy of the weekly report also auto-downloads Sunday 9:00 PM as long as the app is open then.',
+        'Each report is an Excel file with sales, staff KPIs, and best sellers.',
       ]),
       h('div', { class: 'row' }, [
         h('button', {
@@ -100,30 +155,11 @@ export function renderReports(content) {
           'This Week',
         ]),
       ]),
-      h('div', { style: { marginTop: '8px' } }, [
-        h('button', {
-          class: 'btn btn--text',
-          onclick: async () => {
-            const picked = await pickDate();
-            if (!picked) return;
-            try {
-              const bytes = await ReportService.buildDailyReport(picked);
-              const key = formatDate(picked, 'dd/MM/yyyy');
-              FileDownloadService.downloadBytes(bytes, `sales-report-${key}.xlsx`, FileDownloadService.xlsxMimeType);
-            } catch (e) {
-              toast(`Report failed: ${e.message}`, { type: 'error' });
-            }
-          },
-        }, [
-          h('span', { class: 'icon material-symbols-outlined', style: { fontSize: '18px' } }, ['calendar_month']),
-          'Pick a different day…',
-        ]),
-      ]),
     ]),
   );
 
-  // ---- Summary card ----
-  root.append(
+  // ---- Summary ----
+  body.append(
     h('div', { style: { height: '20px' } }, []),
     h('div', { class: 'kpi-grid' }, [
       h('div', { class: 'kpi-card', style: { flexDirection: 'column', alignItems: 'flex-start' } }, [
@@ -138,7 +174,7 @@ export function renderReports(content) {
   );
 
   // ---- Daily sales chart ----
-  root.append(
+  body.append(
     h('div', { style: { height: '24px' } }, []),
     h('h2', { class: 'section-title', style: { margin: '0 0 12px' } }, ['Daily Sales (last 7 days)']),
     h('div', { class: 'card' }, [
@@ -160,12 +196,12 @@ export function renderReports(content) {
   );
 
   // ---- Top items ----
-  root.append(
+  body.append(
     h('div', { style: { height: '24px' } }, []),
     h('h2', { class: 'section-title', style: { margin: '0 0 8px' } }, ['Top Items by Revenue']),
   );
   if (topItems.length === 0) {
-    root.append(emptyCard('No items sold yet.'));
+    body.append(emptyCard('No items sold yet.'));
   } else {
     const card = h('div', { class: 'card', style: { padding: '0' } }, []);
     for (const it of topItems.slice(0, 8)) {
@@ -179,16 +215,16 @@ export function renderReports(content) {
         ]),
       );
     }
-    root.append(card);
+    body.append(card);
   }
 
   // ---- Sales by cashier ----
-  root.append(
+  body.append(
     h('div', { style: { height: '24px' } }, []),
     h('h2', { class: 'section-title', style: { margin: '0 0 8px' } }, ['Sales by Cashier']),
   );
   if (topUsers.length === 0) {
-    root.append(emptyCard('No sales recorded yet.'));
+    body.append(emptyCard('No sales recorded yet.'));
   } else {
     const card = h('div', { class: 'card', style: { padding: '0' } }, []);
     for (const u of topUsers) {
@@ -205,30 +241,77 @@ export function renderReports(content) {
         ]),
       );
     }
-    root.append(card);
+    body.append(card);
+  }
+}
+
+// ------------------ Receipts sub-tab ------------------
+
+function drawReceiptsTab(body) {
+  const receipts = ReceiptsProvider.receipts;
+
+  body.append(
+    h('div', { class: 'card' }, [
+      h('h2', { class: 'section-title', style: { margin: '0 0 4px' } }, ['Receipts']),
+      h('p', { style: { color: 'var(--muted)', fontSize: '12px', marginTop: '0' } }, [
+        'Tap a receipt to view its preview (and reprint if needed). Use the PDF button to download a copy for archival or email.',
+      ]),
+    ]),
+  );
+
+  if (receipts.length === 0) {
+    body.append(
+      h('div', { class: 'empty-state', style: { marginTop: '20px' } }, [
+        'No receipts yet. Complete a sale to generate the first receipt.',
+      ]),
+    );
+    return;
   }
 
-  content.append(root);
+  const card = h('div', { class: 'card', style: { marginTop: '12px', padding: '0' } }, []);
+  for (const r of receipts) {
+    const row = h('div', { class: 'list-item' }, [
+      h('div', { class: 'list-item__avatar' }, [r.receiptNumber.substring(0, 3)]),
+      h('div', { class: 'list-item__main' }, [
+        h('div', { class: 'list-item__title' }, [
+          h('strong', {}, [`#${r.receiptNumber}`]),
+          h('span', { style: { color: 'var(--muted)', fontSize: '12px', fontWeight: 'normal', marginLeft: '8px' } }, [r.orderNumber]),
+        ]),
+        h('div', { class: 'list-item__subtitle' }, [
+          `${formatDate(r.issuedAt, 'dd/MM/yyyy hh:mm a')} · ${r.cashierName}` +
+            (r.reprintCount > 0 ? ` · Reprinted ×${r.reprintCount}` : ''),
+        ]),
+      ]),
+      h('div', { class: 'list-item__trailing', style: { color: 'var(--primary)' } }, [
+        formatMoney(r.total),
+      ]),
+      h('button', {
+        class: 'btn btn--outlined btn--sm',
+        title: 'Download PDF copy',
+        onclick: async (e) => {
+          e.stopPropagation();
+          try {
+            await PrinterService.exportPdfBothCopies(r);
+            toast(`PDF downloaded for receipt #${r.receiptNumber}`, { type: 'success' });
+          } catch (err) {
+            toast(`PDF failed: ${err.message}`, { type: 'error' });
+          }
+        },
+      }, [
+        h('span', { class: 'icon material-symbols-outlined', style: { fontSize: '14px' } }, ['picture_as_pdf']),
+        'PDF',
+      ]),
+    ]);
+    // Tap anywhere on the row (except the PDF button) opens the receipt preview.
+    row.addEventListener('click', (e) => {
+      if (e.target.closest('button')) return;
+      navigate(`/receipts/${r.id}`);
+    });
+    card.append(row);
+  }
+  body.append(card);
 }
 
 function emptyCard(text) {
   return h('div', { class: 'card' }, [h('div', { class: 'empty-state' }, [text])]);
-}
-
-function pickDate() {
-  return new Promise((resolve) => {
-    const input = h('input', { type: 'date', style: { position: 'fixed', opacity: '0', pointerEvents: 'none' } });
-    document.body.appendChild(input);
-    input.max = new Date().toISOString().slice(0, 10);
-    input.min = '2020-01-01';
-    input.addEventListener('change', () => {
-      const v = input.value;
-      input.remove();
-      if (!v) return resolve(null);
-      const [y, m, d] = v.split('-').map(Number);
-      resolve(new Date(y, m - 1, d));
-    });
-    // Cancel if user closes picker without selecting.
-    setTimeout(() => input.click(), 50);
-  });
 }

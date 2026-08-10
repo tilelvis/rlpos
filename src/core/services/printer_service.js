@@ -142,7 +142,14 @@ export const PrinterService = {
    *  it never opens the print dialog. We keep it visually hidden with
    *  opacity:0 and a 1px height, and wait for onLoad (with a timeout
    *  fallback) rather than a fixed delay so we don't call print() before
-   *  the receipt content has actually laid out. */
+   *  the receipt content has actually laid out.
+   *
+   *  NOTE: `window.print()` is synchronous and blocks the JS event loop
+   *  until the print dialog closes in real Chrome. We call it inside a
+   *  setTimeout(..., 0) so the calling code's await chain resolves
+   *  first — the receipt-preview page's post-print flow can then run
+   *  (auto-logout, navigate to dashboard) without waiting for the
+   *  user to dismiss the print dialog. */
   async _printHtml(htmlContent) {
     const frame = document.createElement('iframe');
     frame.style.position = 'fixed';
@@ -171,18 +178,26 @@ export const PrinterService = {
     // One more tick so layout settles before print() is invoked.
     await new Promise((r) => setTimeout(r, 80));
 
-    try {
-      frame.contentWindow?.print();
-    } catch (e) {
-      console.warn('[printer] window.print() failed:', e);
-    }
+    // Call print() in a detached timeout so it doesn't block the
+    // calling code's promise chain. The print dialog opens in its
+    // own context; the JS event loop continues to run, allowing the
+    // receipt-preview page to navigate to the dashboard etc. while
+    // the user is still choosing print options.
+    setTimeout(() => {
+      try {
+        frame.contentWindow?.print();
+      } catch (e) {
+        console.warn('[printer] window.print() failed:', e);
+      }
+    }, 0);
 
-    // Remove the iframe after a delay so the print dialog stays alive.
+    // Remove the iframe after a long delay so the print dialog stays
+    // alive even if the user takes a while to confirm.
     setTimeout(() => {
       try {
         frame.remove();
       } catch {}
-    }, 6000);
+    }, 60000);
   },
 
   // ---- PDF export ----
