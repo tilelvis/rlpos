@@ -1,0 +1,21 @@
+{
+  "name": "raicilabs-pos-web",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Raicilabs POS — HTML + Vite + PWA, with WebUSB thermal printer (WinUSB/Zadig ready).",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview --host --port 4173",
+    "serve": "vite preview --host --port 4173"
+  },
+  "dependencies": {
+    "jspdf": "^2.5.2",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "vite": "^5.4.10",
+    "vite-plugin-pwa": "^0.20.5"
+  }
+}
