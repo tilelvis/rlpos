@@ -21,13 +21,11 @@
   <!-- PWA theme color -->
   <meta name="theme-color" content="#C0392B" />
 
-  <!-- Google Fonts: Inter (UI) + Material Symbols Outlined (icons) -->
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link
-    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&display=swap"
-    rel="stylesheet"
-  />
+  <!-- Fonts are self-hosted (see src/main.js -> @fontsource/inter) and
+       bundled into the build output — no Google Fonts CDN request is
+       made at runtime, so the app works fully offline from first load.
+       Icons are inline SVG (src/core/icons.js), not a web font, so no
+       icon font is loaded at all. -->
 
   <style>
     /* Loading screen — shown until the JS bundle boots the auth gate.

@@ -3,6 +3,16 @@
 //
 // Port of lib/main.dart (Flutter).
 
+// Self-hosted JetBrains Mono, used as the whole-app UI font (see
+// --font-sans in styles/main.css). Bundled from node_modules — same
+// origin at runtime, no CDN request, ever. The receipt/mono elements
+// use a separate system-monospace stack (--font-mono), untouched here.
+import '@fontsource/jetbrains-mono/400.css';
+import '@fontsource/jetbrains-mono/500.css';
+import '@fontsource/jetbrains-mono/600.css';
+import '@fontsource/jetbrains-mono/700.css';
+import '@fontsource/jetbrains-mono/800.css';
+
 import './styles/main.css';
 
 import { SeedService } from './core/services/seed.js';

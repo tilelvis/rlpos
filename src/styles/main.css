@@ -23,7 +23,7 @@
   --shadow-hover: 0 4px 14px rgba(0,0,0,0.08), 0 2px 6px rgba(0,0,0,0.04);
   --shadow-floating: 0 8px 28px rgba(0,0,0,0.12), 0 4px 10px rgba(0,0,0,0.06);
   --shadow-receipt: 0 4px 16px rgba(0,0,0,0.08);
-  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-sans: 'JetBrains Mono', 'SFMono-Regular', Consolas, Menlo, monospace;
   --font-mono: "Courier New", "Liberation Mono", "DejaVu Sans Mono", monospace;
   --header-h: 56px;
   --bottomnav-h: 64px;
@@ -416,24 +416,19 @@ a:hover { text-decoration: underline; }
   border-color: var(--primary);
 }
 
-/* --- Icon helper (uses Material Symbols font loaded via index.html) --- */
+/* --- Icon helper ---
+   The "material-symbols-outlined" class name is kept on <span> elements
+   for readability/grep-ability only. No icon font is ever loaded: the
+   h() hyperscript helper (core/ui.js) intercepts the ligature text and
+   swaps it for an inline SVG from core/icons.js at render time. This
+   guarantees icons render identically with zero network requests and
+   zero dependency on any font being installed or downloaded. */
 .icon {
   display: inline-flex;
   align-items: center;
-  font-family: 'Material Symbols Outlined';
-  font-weight: normal;
-  font-style: normal;
   font-size: 20px;
   line-height: 1;
-  letter-spacing: normal;
-  text-transform: none;
-  white-space: nowrap;
-  word-wrap: normal;
-  direction: ltr;
-  -webkit-font-feature-settings: 'liga';
-  -webkit-font-smoothing: antialiased;
 }
-.icon.material-symbols-outlined { font-family: 'Material Symbols Outlined'; }
 
 /* --- KPI cards (dashboard) --- */
 .kpi-grid {

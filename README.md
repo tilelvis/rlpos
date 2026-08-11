@@ -265,6 +265,26 @@ The `dist/` folder is pure static files. Deploy it to any static host:
 
 ---
 
+## Offline guarantees
+
+This app is audited to make **zero network requests at runtime**, so it works from the first load with no internet connection ever having been available:
+
+| Dependency | Before | Now |
+|---|---|---|
+| UI font | Loaded from `fonts.googleapis.com` / `fonts.gstatic.com` (Inter) | Self-hosted via `@fontsource/jetbrains-mono`, bundled into the build, precached by the service worker. Used for all UI chrome (`--font-sans`); the receipt preview keeps its own separate system-monospace stack (`--font-mono`, unchanged) |
+| Icons | `<link>` tag advertised "Material Symbols Outlined" web font | Was already rendered as inline SVG at runtime (`core/icons.js`) regardless — the web-font `<link>` and leftover `font-family` CSS were dead weight and have been removed |
+| PDF export (jsPDF) | npm package, lazy-loaded chunk | Unchanged — already bundled locally, no CDN |
+| Excel export (SheetJS/xlsx) | npm package, lazy-loaded chunk | Unchanged — already bundled locally, no CDN |
+| Printing (WebUSB / browser print) | Local device APIs only | Unchanged — no network involved by design |
+| Data persistence | `localStorage` | Unchanged — no backend, no API calls |
+| Service worker | Precached app shell + runtime-cached Google Fonts | Precaches the entire app shell **including** the self-hosted font files; no runtime caching of any third-party origin remains, because there is no third-party origin left to call |
+
+The only external URLs left anywhere in the app are plain `<a href>` links to `https://zadig.akeo.ie/` in the optional WinUSB setup guide (Settings → Printer → Setup Guide) — these are informational links a user may click, not resources the app loads or depends on to function.
+
+**One manual step required:** run `npm install` once after pulling these changes so `@fontsource/jetbrains-mono` is downloaded into `node_modules` (this needs internet, same as any `npm install`). After that, `npm run build` produces a `dist/` folder that is 100% self-contained — deploy it once, and the terminal keeps working indefinitely with no connection at all.
+
+---
+
 ## Differences from the original Flutter app
 
 | Aspect | Flutter app | This port |
@@ -278,7 +298,7 @@ The `dist/` folder is pure static files. Deploy it to any static host:
 | PDF export | `pdf` + `printing` Dart packages | `jspdf` (lazy-loaded) |
 | Excel export | `excel` Dart package | `xlsx` (SheetJS, lazy-loaded) |
 | Icons | Material Icons (font) | Material Symbols Outlined (Google Fonts) |
-| Typography | Google Fonts (Inter) | Google Fonts (Inter) |
+| Typography | Google Fonts (Inter) | Self-hosted JetBrains Mono (`@fontsource/jetbrains-mono`) |
 | Routing | Flutter Navigator (push/pop) | Hash-based router (`#/login`, `#/dashboard`, etc.) |
 | WinUSB/Zadig docs | Brief mention in `WINDOWS_DESKTOP.md` | Full 10-step walkthrough at `#/settings/printer-setup` |
 
