@@ -5,7 +5,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
 
     steps:
       - name: Checkout
@@ -17,22 +17,71 @@ jobs:
           node-version: 20
           cache: npm
 
-      - name: Install dependencies
+      - name: Install npm dependencies
         run: npm ci
 
       - name: Build Vite application
         run: npm run build
 
-      - name: Verify production build
+      - name: Verify Vite build
+        shell: pwsh
         run: |
-          echo "Checking dist directory..."
-          test -f dist/index.html
-          echo "Production build successful."
-          du -sh dist
+          if (!(Test-Path "dist/index.html")) {
+            Write-Error "dist/index.html was not created."
+            exit 1
+          }
 
-      - name: Upload POS application
+          Write-Host "Vite build successful."
+          Get-ChildItem dist
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.23"
+
+      - name: Build Windows local server
+        shell: pwsh
+        run: |
+          $env:GOOS = "windows"
+          $env:GOARCH = "amd64"
+          $env:CGO_ENABLED = "0"
+
+          go build -ldflags="-s -w" -o server.exe server.go
+
+          if (!(Test-Path "server.exe")) {
+            Write-Error "server.exe was not created."
+            exit 1
+          }
+
+          Write-Host "server.exe created successfully."
+
+      - name: Create portable POS package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path "Raicilabs POS/app" | Out-Null
+
+          Copy-Item -Recurse -Force "dist/*" "Raicilabs POS/app/"
+          Copy-Item -Force "server.exe" "Raicilabs POS/server.exe"
+          Copy-Item -Force "START POS.bat" "Raicilabs POS/START POS.bat"
+
+          Write-Host ""
+          Write-Host "Portable POS package:"
+          Get-ChildItem -Recurse "Raicilabs POS"
+
+      - name: Create ZIP package
+        shell: pwsh
+        run: |
+          Compress-Archive `
+            -Path "Raicilabs POS" `
+            -DestinationPath "Raicilabs-POS-Offline-Windows.zip" `
+            -Force
+
+          Write-Host "Package created:"
+          Get-Item "Raicilabs-POS-Offline-Windows.zip"
+
+      - name: Upload portable POS
         uses: actions/upload-artifact@v4
         with:
-          name: raicilabs-pos-web
-          path: dist/
+          name: raicilabs-pos-offline-windows
+          path: Raicilabs-POS-Offline-Windows.zip
           if-no-files-found: error
