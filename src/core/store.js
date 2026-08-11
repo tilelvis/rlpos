@@ -106,8 +106,16 @@ export const Auth = {
   // Restore from storage on app start.
   restore() {
     const id = StorageService_currentUserId_read();
-    if (!id) return null;
+    if (!id) {
+      console.info('[auth] restore(): no session id in storage — starting as guest.');
+      return null;
+    }
     const user = StorageService_findUserById(id);
+    if (!user) {
+      console.warn(`[auth] restore(): session id "${id}" found in storage, but no matching user exists — starting as guest. (Was the users list cleared/reset while a session was still stored?)`);
+    } else {
+      console.info(`[auth] restore(): restored session for "${user.username}" (${user.role}).`);
+    }
     _currentUser = user;
     return user;
   },

@@ -43,7 +43,8 @@ function readScalar(key, defaultValue = null) {
     const raw = localStorage.getItem(key);
     if (raw === null) return defaultValue;
     return JSON.parse(raw);
-  } catch {
+  } catch (e) {
+    console.error(`[storage] failed to read ${key} — falling back to default (${JSON.stringify(defaultValue)}):`, e);
     return defaultValue;
   }
 }

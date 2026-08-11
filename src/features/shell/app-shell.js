@@ -200,7 +200,6 @@ function drawBottomNav(bottomnav) {
     const btn = h('button', {
       class: `bottomnav__item ${_state.view === item.view ? 'active' : ''}`,
       onclick: () => {
-        _state.view = item.view;
         const path = item.view === 'dashboard' ? '/dashboard'
           : item.view === 'new-order' ? '/orders/new'
           : item.view === 'orders' ? '/orders'
@@ -208,10 +207,15 @@ function drawBottomNav(bottomnav) {
           : item.view === 'menu' ? '/menu'
           : item.view === 'settings' ? '/settings'
           : '/dashboard';
+        // Don't set _state.view or draw here. navigate() runs the
+        // router's permission guard first; only once that guard
+        // passes does ensureShellThen() dispatch 'app:navigate',
+        // which is what actually flips _state.view and repaints.
+        // Painting the target view here, before the guard runs,
+        // is what caused a visible flash of the target page followed
+        // by a bounce back to Dashboard whenever the guard rejected
+        // the route.
         navigate(path);
-        drawAppbar(document.querySelector('.appbar'));
-        drawBottomNav(document.querySelector('.bottomnav'));
-        drawContent(document.querySelector('.app-shell__content'));
       },
     }, [
       h('span', { class: 'icon material-symbols-outlined' }, [item.icon]),
