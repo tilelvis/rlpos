@@ -6,6 +6,16 @@ import { VitePWA } from 'vite-plugin-pwa';
 // Output is a pure static bundle (HTML + JS + CSS + service worker) that
 // can be deployed to Vercel, Netlify, GitHub Pages, or any static host.
 // HTTPS is required for WebUSB — Vercel and Netlify give you that for free.
+//
+// TAURI_BUILD=true skips the PWA/service-worker plugin entirely. When
+// this bundle is wrapped by Tauri (see src-tauri/), every file already
+// ships inside the installed .exe — there's no "first load" to precache
+// and no remote host to go offline from. Registering a service worker
+// there adds no offline benefit and reintroduces the one real risk this
+// project works hard to avoid: a webview left running an old cached
+// build after a newer version is installed alongside it.
+const isTauriBuild = process.env.TAURI_BUILD === 'true';
+
 export default defineConfig({
   base: './',
   // IMPORTANT: explicitly set an empty PostCSS config object. Without
@@ -28,7 +38,7 @@ export default defineConfig({
     chunkSizeWarningLimit: 1500,
   },
   plugins: [
-    VitePWA({
+    ...(isTauriBuild ? [] : [VitePWA({
       // Use injectManifest strategy so we control the service worker file
       // directly (needed for POS-specific caching: app shell + indexedDB
       // backed localStorage fallback for offline use).
@@ -86,7 +96,7 @@ export default defineConfig({
         enabled: true,
         type: 'module',
       },
-    }),
+    })]),
   ],
   server: {
     port: 5173,

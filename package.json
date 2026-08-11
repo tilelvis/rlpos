@@ -8,7 +8,12 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview --host --port 4173",
-    "serve": "vite preview --host --port 4173"
+    "serve": "vite preview --host --port 4173",
+    "build:tauri": "node scripts/vite-for-tauri.mjs build",
+    "dev:tauri": "node scripts/vite-for-tauri.mjs dev",
+    "tauri": "npx @tauri-apps/cli",
+    "tauri:dev": "npx @tauri-apps/cli dev",
+    "tauri:build": "npx @tauri-apps/cli build"
   },
   "dependencies": {
     "@fontsource/jetbrains-mono": "^5.2.6",

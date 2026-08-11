@@ -265,6 +265,35 @@ The `dist/` folder is pure static files. Deploy it to any static host:
 
 ---
 
+## Windows desktop build (Tauri)
+
+For a client PC with no browser install step, no local server to keep running, and no reliance on a remote host staying reachable, the same `dist/` bundle can be wrapped as a native Windows `.msi`/`.exe` with [Tauri](https://tauri.app). The wrapper lives in `src-tauri/` and is otherwise unrelated to the web build — the app code itself (`src/`) doesn't change at all.
+
+**Building via GitHub Actions (recommended — no Rust toolchain needed locally):**
+
+Push a tag like `v1.0.0`, or run `.github/workflows/build-windows.yml` manually from the Actions tab. It checks out the repo on a `windows-latest` runner, builds the Vite bundle, compiles the Tauri wrapper, and uploads the `.msi`/`.exe` installer as a workflow artifact — nothing to install on your own machine.
+
+**Building locally** (needs [Rust](https://rustup.rs) installed in addition to Node):
+
+```bash
+npm install
+npm run tauri:build
+# Output: src-tauri/target/release/bundle/msi/*.msi
+#         src-tauri/target/release/bundle/nsis/*.exe
+```
+
+`npm run tauri:dev` opens a live-reloading desktop window against the Vite dev server, for testing against the actual WebView2 host before shipping a build.
+
+### WebUSB inside WebView2
+
+Tauri hosts pages in Windows' WebView2 (Chromium-based Edge), which inherits most web APIs including `navigator.usb`. In practice this works the same as a full Chrome/Edge tab **once the printer's Windows driver has been swapped to WinUSB via Zadig** (see the setup guide in Settings → Printer → Setup Guide) — that driver swap is what actually makes the device claimable over WebUSB at all, independent of which app or framework is hosting the page. If you hit an issue pairing in this build specifically, `npm run tauri:dev` opens a live-reloading desktop window against the Vite dev server so you can test against the real WebView2 host before shipping — and the existing browser-print-dialog fallback in `printer_service.js` is always there as a backup path regardless.
+
+### Why the desktop build skips the service worker
+
+The Vite build normally registers a service worker (via `vite-plugin-pwa`) to precache the app for offline browser/PWA use. The Tauri build sets `TAURI_BUILD=true` when running `vite build`, which skips that plugin entirely (see `vite.config.js`) — every file already ships inside the installed `.exe`, so there's no "first load" to precache, and registering one anyway would only reintroduce the stale-cache-after-update risk this project otherwise avoids.
+
+---
+
 ## Offline guarantees
 
 This app is audited to make **zero network requests at runtime**, so it works from the first load with no internet connection ever having been available:
