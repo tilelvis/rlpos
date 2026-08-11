@@ -23,6 +23,13 @@ import { registerRoutes } from './routes.js';
 import { bootRouter } from './core/router.js';
 
 async function main() {
+  // If a new service worker takes control while this page is open,
+  // reload once so the POS immediately uses the new application build.
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      window.location.reload();
+    });
+  }
   // Wire the auth bridge to StorageService.
   wireAuthToStorageService(StorageService);
 
