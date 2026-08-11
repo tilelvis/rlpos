@@ -25,9 +25,25 @@ export const AuthProvider = {
     Auth.setUser(null);
   },
 
-  /** Restore session from localStorage on app start. */
+  /** Restore session from localStorage on app start.
+   *
+   *  IMPORTANT: only admin and cashier sessions are restored. Waiter
+   *  sessions are NEVER restored — waiters are transient (they sign
+   *  in via the Complete Sale signature flow and auto-logout after
+   *  print). If a waiter signed in and then refreshed the page, we
+   *  want them back to guest mode, not still logged in as a waiter.
+   *
+   *  Admin/cashier sessions ARE restored so a refresh during a shift
+   *  doesn't force them to sign in again. */
   restore() {
-    return Auth.restore();
+    const id = Auth.restore();
+    if (id && !id.canViewFinancials) {
+      // Restored user is a waiter (or other non-financial role) —
+      // sign them out immediately.
+      Auth.setUser(null);
+      return null;
+    }
+    return id;
   },
 };
 

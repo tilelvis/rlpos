@@ -23,6 +23,7 @@ import { OrdersProvider } from '../../core/providers/orders.js';
 import { store, CHANNELS } from '../../core/store.js';
 import { navigate } from '../../core/router.js';
 import { AuthProvider } from '../../core/providers/auth.js';
+import { saleContext } from '../../core/sale-context.js';
 
 export function renderReceiptPreview(receiptId) {
   const receipt = ReceiptsProvider.findById(receiptId);
@@ -32,11 +33,19 @@ export function renderReceiptPreview(receiptId) {
     return;
   }
 
-  // The user who completed this sale — stashed by new-order.js before
-  // navigating here. Used to decide post-print behaviour (auto-logout
-  // for waiters, toast for waiters, stay-logged-in for admin/cashier).
-  const saleUser = window.__lastSaleUser || AuthProvider.currentUser;
-  const saleOrderId = window.__lastSaleOrderId || receipt.orderId;
+  // ENTRY PATH detection:
+  //   - WAITER PATH: saleContext.isSet is true → we just came from a
+  //     Complete Sale flow. The sale user might be a waiter → auto-
+  //     logout after print + show "X orders today" toast.
+  //   - ADMIN/CASHIER PATH: saleContext.isSet is false → we came from
+  //     Orders/Reports reprint. Use AuthProvider.currentUser. NO
+  //     auto-logout, NO waiter toast.
+  //
+  // This differentiation fixes the bug where an admin reprinting a
+  // receipt would get auto-logged-out because the old
+  // window.__lastSaleUser was stale from a previous waiter sale.
+  const saleUser = saleContext.isSet ? saleContext.user : AuthProvider.currentUser;
+  const isWaiterPath = saleContext.isSet;
 
   // Local UI state
   let _paper = receipt.paperWidth || 'mm58';
@@ -72,15 +81,16 @@ export function renderReceiptPreview(receiptId) {
     if (refreshed) drawPreview(refreshed);
   });
 
-  // Cleanup on navigate-away.
-  const obs = new MutationObserver(() => {
+  // Cleanup on navigate-away. Use polling instead of a body-level
+  // MutationObserver with subtree:true (which would fire for every DOM
+  // mutation and wedge the event loop during re-renders).
+  const cleanup = setInterval(() => {
     if (!document.body.contains(root)) {
       unsubUsb();
       unsubReceipts();
-      obs.disconnect();
+      clearInterval(cleanup);
     }
-  });
-  obs.observe(document.body, { childList: true, subtree: true });
+  }, 1000);
 
   function drawAppbar() {
     clear(appbar);
@@ -257,15 +267,23 @@ export function renderReceiptPreview(receiptId) {
   }
 
   /** Called after a successful print. Decides what to do based on the
-   *  sale user's role:
-   *    Waiter → auto-logout, show "X orders today" toast, navigate to dashboard.
-   *    Admin/Cashier → stay logged in, navigate to dashboard.
-   *    Guest (shouldn't happen — Complete Sale requires login) → just navigate. */
+   *  entry path:
+   *    WAITER PATH (saleContext was set) → auto-logout, show "X orders
+   *      today" toast, navigate to dashboard. This happens regardless
+   *      of the sale user's role — even if an admin completed a sale
+   *      via the Complete Sale flow (which sets saleContext), they
+   *      get the waiter-style flow. (In practice, an admin who is
+   *      already logged in wouldn't go through the Complete Sale
+   *      signature flow — they'd just complete the sale directly.
+   *      But if they did, the saleContext is set, so we treat them
+   *      as a "waiter" for post-print purposes.)
+   *    ADMIN/CASHIER PATH (saleContext was NOT set) → stay logged in,
+   *      navigate to dashboard. This is the reprint path. */
   function afterPrintSuccess() {
     if (_postPrintHandled) return;
     _postPrintHandled = true;
 
-    if (saleUser && saleUser.role === 'waiter') {
+    if (isWaiterPath && saleUser && saleUser.role === 'waiter') {
       // Waiter: count their completed orders today, show toast, logout.
       const count = OrdersProvider.countByUserToday(saleUser.id);
       const msg = count === 1
@@ -273,26 +291,27 @@ export function renderReceiptPreview(receiptId) {
         : `You've raised ${count} orders today`;
       toast(msg, { type: 'success', duration: 4500 });
       AuthProvider.signOut();
-      // Brief delay so the toast is visible before navigation.
+      saleContext.clear();
       setTimeout(() => navigate('/dashboard'), 600);
       return;
     }
 
-    // Admin/cashier: stay logged in, go to dashboard.
+    // Admin/cashier path OR waiter path with non-waiter sale user:
+    // stay logged in, go to dashboard. Clear sale context if set.
+    saleContext.clear();
     navigate('/dashboard');
   }
 
   /** Called when user dismisses the preview without printing (close button). */
   function afterPrintCancel() {
-    // If a waiter signed in to complete the sale but then cancelled the
-    // print, still log them out (their signature was used to create the
-    // receipt — they don't get to stay logged in without printing).
-    if (saleUser && saleUser.role === 'waiter') {
+    // If this was a waiter-path sale (saleContext was set), the waiter
+    // signed in to complete the sale but cancelled the print. Their
+    // signature was used to create the receipt — they don't get to
+    // stay logged in without printing. Log them out.
+    if (isWaiterPath && saleUser && saleUser.role === 'waiter') {
       AuthProvider.signOut();
     }
-    // Clear the stashed sale context.
-    delete window.__lastSaleUser;
-    delete window.__lastSaleOrderId;
+    saleContext.clear();
     navigate('/dashboard');
   }
 

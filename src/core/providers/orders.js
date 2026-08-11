@@ -129,12 +129,19 @@ export const OrdersProvider = {
   /** Mark a completed order as paid. Only admin/cashier may call this
    *  — the caller is responsible for ensuring the user is authorised
    *  (the unpaid-orders modal checks `user.canViewFinancials` before
-   *  showing the "Mark paid" button). */
-  async markPaid(orderId, user) {
+   *  showing the "Confirm payment" button).
+   *
+   *  @param {string} orderId
+   *  @param {User} user - the admin/cashier confirming payment
+   *  @param {Object} opts
+   *  @param {string} opts.paymentType - 'cash' | 'mpesa'
+   *  @param {string|null} opts.paymentRef - optional reference (e.g. M-Pesa confirmation code)
+   */
+  async markPaid(orderId, user, { paymentType = 'cash', paymentRef = null } = {}) {
     const o = StorageService.findOrder(orderId);
     if (!o) return;
     if (o.status !== 'completed') return;
-    const updated = o.markPaidBy(user);
+    const updated = o.markPaidBy(user, { paymentType, paymentRef });
     await StorageService.upsertOrder(updated);
     store.bump(CHANNELS.orders);
     return updated;

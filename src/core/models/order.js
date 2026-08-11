@@ -37,6 +37,8 @@ export class Order {
     paidAt = null,
     paidById = null,
     paidByName = null,
+    paymentType = null,    // 'cash' | 'mpesa' | null (not yet paid)
+    paymentRef = null,    // e.g. M-Pesa confirmation code, or null for cash
   }) {
     this.id = id;
     this.orderNumber = orderNumber;
@@ -52,6 +54,8 @@ export class Order {
     this.paidAt = paidAt;
     this.paidById = paidById;
     this.paidByName = paidByName;
+    this.paymentType = paymentType;
+    this.paymentRef = paymentRef;
   }
 
   get total() {
@@ -84,6 +88,8 @@ export class Order {
     paidAt,
     paidById,
     paidByName,
+    paymentType,
+    paymentRef,
   } = {}) {
     return new Order({
       id: this.id,
@@ -100,17 +106,33 @@ export class Order {
       paidAt: paidAt ?? this.paidAt,
       paidById: paidById ?? this.paidById,
       paidByName: paidByName ?? this.paidByName,
+      paymentType: paymentType ?? this.paymentType,
+      paymentRef: paymentRef ?? this.paymentRef,
     });
   }
 
-  /** Mark this order as paid by the given user. Returns a new Order. */
-  markPaidBy(user) {
+  /** Mark this order as paid by the given user, with the given payment
+   *  type ('cash' or 'mpesa') and optional reference (e.g. M-Pesa
+   *  confirmation code). Returns a new Order. */
+  markPaidBy(user, { paymentType = 'cash', paymentRef = null } = {}) {
     return this.copyWith({
       paid: true,
       paidAt: new Date().toISOString(),
       paidById: user.id,
       paidByName: user.displayName,
+      paymentType,
+      paymentRef,
     });
+  }
+
+  /** Human-readable label for the payment method, or 'Unpaid'. */
+  get paymentLabel() {
+    if (!this.paid) return 'Unpaid';
+    if (this.paymentType === 'mpesa') {
+      return this.paymentRef ? `M-Pesa (${this.paymentRef})` : 'M-Pesa';
+    }
+    if (this.paymentType === 'cash') return 'Cash';
+    return 'Paid';
   }
 
   toMap() {
@@ -129,6 +151,8 @@ export class Order {
       paidAt: this.paidAt,
       paidById: this.paidById,
       paidByName: this.paidByName,
+      paymentType: this.paymentType,
+      paymentRef: this.paymentRef,
     };
   }
 
@@ -152,6 +176,9 @@ export class Order {
       paidAt: m.paidAt ?? (m.status === 'completed' ? m.completedAt : null),
       paidById: m.paidById ?? m.cashierId,
       paidByName: m.paidByName ?? m.cashierName,
+      // Migration: paymentType/paymentRef are null on old orders.
+      paymentType: m.paymentType ?? null,
+      paymentRef: m.paymentRef ?? null,
     });
   }
 }

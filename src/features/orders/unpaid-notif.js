@@ -4,12 +4,12 @@
 // the count of unpaid orders. Visible ONLY to admin/cashier users
 // (waiters and guests don't see it — they can't mark orders as paid).
 //
-// Clicking the chip opens a modal listing all unpaid orders with a
-// "Mark paid" button next to each. Marking an order as paid updates
-// its `paid` flag and bumps the orders channel so the modal refreshes.
-//
-// The chip is rendered ONCE into a fixed-position container on first
-// call. Subsequent calls just refresh its content (count + visibility).
+// Clicking the chip opens a modal listing all unpaid orders. Each row
+// has a "Confirm payment" button that opens a SECOND modal asking the
+// admin/cashier to choose a payment type (Cash or M-Pesa Paybill) and
+// optionally enter a reference (e.g. M-Pesa confirmation code) before
+// the order is marked as paid. This two-step flow ensures we always
+// capture HOW an order was paid, not just THAT it was paid.
 
 import { h, clear, toast, formatMoney, formatDate, showModal } from '../../core/ui.js';
 import { AuthProvider } from '../../core/providers/auth.js';
@@ -74,7 +74,7 @@ function openUnpaidOrdersModal() {
     }
     body.append(
       h('p', { style: { color: 'var(--muted)', fontSize: '13px', margin: '0 0 12px' } }, [
-        `${unpaid.length} order${unpaid.length === 1 ? '' : 's'} awaiting payment. Tap "Mark paid" once you've received the cash / M-Pesa.`,
+        `${unpaid.length} order${unpaid.length === 1 ? '' : 's'} awaiting payment. Tap "Confirm payment" once you've received the cash or M-Pesa.`,
       ]),
     );
     const list = h('div', { class: 'card', style: { padding: '0', maxHeight: '50vh', overflowY: 'auto' } }, []);
@@ -101,18 +101,10 @@ function openUnpaidOrdersModal() {
           ]),
           h('button', {
             class: 'btn btn--filled btn--sm',
-            onclick: async () => {
-              try {
-                await OrdersProvider.markPaid(o.id, user);
-                toast(`Marked ${o.orderNumber} as paid.`, { type: 'success' });
-                refresh();
-              } catch (e) {
-                toast(`Failed: ${e.message}`, { type: 'error' });
-              }
-            },
+            onclick: () => openConfirmPaymentModal(o, user, refresh),
           }, [
-            h('span', { class: 'icon material-symbols-outlined', style: { fontSize: '14px' } }, ['check']),
-            'Mark paid',
+            h('span', { class: 'icon material-symbols-outlined', style: { fontSize: '14px' } }, ['payments']),
+            'Confirm payment',
           ]),
         ]),
       );
@@ -130,14 +122,149 @@ function openUnpaidOrdersModal() {
     ],
   });
 
-  // Re-render the modal body when the orders store bumps (e.g. after
-  // marking an order as paid).
-  const unsub = store.subscribe(CHANNELS.orders, refresh);
-  const obs = new MutationObserver(() => {
+  // NOTE: we deliberately do NOT subscribe to CHANNELS.orders here.
+  // The confirm-payment modal (opened from this modal) calls markPaid
+  // which bumps CHANNELS.orders. If we subscribed, the refresh would
+  // fire WHILE the confirm-payment modal is open, causing a nested
+  // re-render that wedges the event loop. Instead, the confirm-payment
+  // modal calls `onConfirmed()` (which is `refresh`) manually after
+  // markPaid succeeds — that's the only time this modal needs to
+  // refresh.
+  const cleanup = setInterval(() => {
     if (!document.body.contains(dlg.root)) {
-      unsub();
-      obs.disconnect();
+      clearInterval(cleanup);
     }
+  }, 1000);
+}
+
+/**
+ * Opens a modal to confirm payment for a specific order. The admin/
+ * cashier must choose a payment type (Cash or M-Pesa Paybill) and
+ * optionally enter a reference (e.g. M-Pesa confirmation code) before
+ * the order is marked as paid.
+ */
+function openConfirmPaymentModal(order, user, onConfirmed) {
+  const state = {
+    paymentType: 'cash',   // 'cash' | 'mpesa'
+    paymentRef: '',         // optional M-Pesa confirmation code
+  };
+
+  const body = h('div', {}, []);
+  function refresh() {
+    clear(body);
+    body.append(
+      // Order summary card
+      h('div', { class: 'card', style: { padding: '12px', marginBottom: '16px', background: 'var(--bg)' } }, [
+        h('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' } }, [
+          h('div', {}, [
+            h('div', { style: { fontWeight: 700, fontSize: '15px' } }, [order.orderNumber]),
+            h('div', { style: { fontSize: '12px', color: 'var(--muted)' } }, [
+              `${order.cashierName} · ${order.itemCount} items`,
+            ]),
+          ]),
+          h('div', { style: { fontSize: '20px', fontWeight: 800, color: 'var(--primary)' } }, [
+            formatMoney(order.total),
+          ]),
+        ]),
+      ]),
+
+      h('p', { style: { color: 'var(--muted)', fontSize: '13px', margin: '0 0 12px' } }, [
+        'How was this payment received? Choose the payment type below. This is recorded on the order for your records.',
+      ]),
+
+      // Payment type dropdown
+      h('div', { class: 'field' }, [
+        h('label', {}, ['Payment type']),
+        h('div', { style: { display: 'flex', gap: '8px' } }, [
+          h('button', {
+            class: `chip ${state.paymentType === 'cash' ? 'active' : ''}`,
+            style: { flex: '1', justifyContent: 'center', padding: '10px' },
+            onclick: () => { state.paymentType = 'cash'; refresh(); },
+          }, [
+            h('span', { class: 'icon material-symbols-outlined', style: { fontSize: '16px' } }, ['payments']),
+            'Cash',
+          ]),
+          h('button', {
+            class: `chip ${state.paymentType === 'mpesa' ? 'active' : ''}`,
+            style: { flex: '1', justifyContent: 'center', padding: '10px' },
+            onclick: () => { state.paymentType = 'mpesa'; refresh(); },
+          }, [
+            h('span', { class: 'icon material-symbols-outlined', style: { fontSize: '16px' } }, ['phone_iphone']),
+            'M-Pesa Paybill',
+          ]),
+        ]),
+      ]),
+
+      // Reference (optional for cash, recommended for M-Pesa)
+      state.paymentType === 'mpesa'
+        ? h('div', { class: 'field' }, [
+            h('label', {}, ['M-Pesa confirmation code (optional)']),
+            h('input', {
+              class: 'input',
+              type: 'text',
+              placeholder: 'e.g. QGH7XK2P9L',
+              value: state.paymentRef,
+              oninput: (e) => { state.paymentRef = e.target.value; },
+            }),
+            h('p', { style: { fontSize: '11px', color: 'var(--muted)', margin: '4px 0 0' } }, [
+              'Enter the M-Pesa confirmation code if available. This helps reconcile payments later.',
+            ]),
+          ])
+        : h('div', { class: 'field' }, [
+            h('label', {}, ['Cash received by (optional note)']),
+            h('input', {
+              class: 'input',
+              type: 'text',
+              placeholder: 'e.g. Exact change',
+              value: state.paymentRef,
+              oninput: (e) => { state.paymentRef = e.target.value; },
+            }),
+          ]),
+    );
+  }
+  refresh();
+
+  const dlg = showModal({
+    title: 'Confirm payment',
+    content: body,
+    size: 'sm',
+    actions: [],
   });
-  obs.observe(document.body, { childList: true, subtree: true });
+
+  dlg.root.querySelector('.modal__actions').append(
+    h('button', { class: 'btn btn--text', onclick: () => dlg.close() }, ['Cancel']),
+    h('button', {
+      class: 'btn btn--filled',
+      onclick: () => {
+        // Capture state before closing (the close triggers DOM changes
+        // that might invalidate references).
+        const paymentType = state.paymentType;
+        const paymentRef = state.paymentRef.trim() || null;
+        const orderId = order.id;
+        const orderNum = order.orderNumber;
+        const cb = onConfirmed;
+
+        // Close THIS modal first.
+        dlg.close();
+
+        // Defer the markPaid call to the next event-loop tick. This
+        // ensures the modal's close animation has started and the
+        // browser has a chance to paint before we trigger the orders
+        // store bump (which causes the dashboard to re-render).
+        setTimeout(async () => {
+          try {
+            await OrdersProvider.markPaid(orderId, user, { paymentType, paymentRef });
+            const payLabel = paymentType === 'mpesa' ? 'M-Pesa' : 'Cash';
+            toast(`Confirmed ${orderNum} as paid via ${payLabel}.`, { type: 'success' });
+            if (cb) cb();
+          } catch (e) {
+            toast(`Failed: ${e.message}`, { type: 'error' });
+          }
+        }, 300);
+      },
+    }, [
+      h('span', { class: 'icon material-symbols-outlined', style: { fontSize: '16px' } }, ['check']),
+      'Confirm payment',
+    ]),
+  );
 }

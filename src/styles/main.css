@@ -176,6 +176,24 @@ a:hover { text-decoration: underline; }
 .appbar__title { font-size: 18px; font-weight: 700; flex: 1; }
 .appbar .btn--icon { color: #fff; background: transparent; }
 .appbar .btn--icon:hover { background: rgba(255,255,255,0.15); }
+/* Staff Sign In button — visible to guests only. White background
+   with red text so it stands out against the red appbar, making it
+   obvious where admins/cashiers should tap to start their shift. */
+.appbar__staff-signin {
+  background: #fff;
+  color: var(--primary);
+  border-color: #fff;
+  font-weight: 700;
+  font-size: 13px;
+  padding: 6px 14px;
+  min-height: 32px;
+  border-radius: 16px;
+}
+.appbar__staff-signin:hover {
+  background: rgba(255,255,255,0.88);
+}
+.appbar__staff-signin:active { transform: scale(0.97); }
+.appbar__staff-signin .icon { color: var(--primary); }
 .appbar__user-chip {
   display: inline-flex;
   align-items: center;

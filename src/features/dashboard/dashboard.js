@@ -116,15 +116,18 @@ export function renderDashboard(content) {
   content.append(root);
 
   // Re-render when menu or orders change.
+  // NOTE: we do NOT subscribe to CHANNELS.auth here — the app shell
+  // already subscribes to auth and calls drawContent() which re-invokes
+  // renderDashboard(). Subscribing here too would cause renderDashboard
+  // to run TWICE per auth change, which during heavy DOM rebuilds can
+  // wedge the event loop.
   const unsubMenu = store.subscribe(CHANNELS.menu, () => renderDashboard(content));
   const unsubOrders = store.subscribe(CHANNELS.orders, () => renderDashboard(content));
-  const unsubAuth = store.subscribe(CHANNELS.auth, () => renderDashboard(content));
   const unsubCart = store.subscribe(CHANNELS.cart, () => renderDashboard(content));
   const obs = new MutationObserver(() => {
     if (!content.contains(root)) {
       unsubMenu();
       unsubOrders();
-      unsubAuth();
       unsubCart();
       obs.disconnect();
     }
@@ -245,13 +248,18 @@ function renderCarousel(categories) {
   }, { passive: true });
 
   // Clean up the timer when the carousel leaves the DOM.
-  const obs = new MutationObserver(() => {
+  // NOTE: we deliberately do NOT use a MutationObserver on document.body
+  // with subtree:true — that would fire for every DOM mutation during
+  // dashboard re-renders (hundreds of nodes), causing the event loop to
+  // wedge. Instead, we poll on a 2-second interval: cheap, reliable, and
+  // doesn't block. The carousel element is GC'd once it's removed from
+  // the DOM and no references remain.
+  const cleanup = setInterval(() => {
     if (!document.body.contains(carousel)) {
       if (_timer) clearInterval(_timer);
-      obs.disconnect();
+      clearInterval(cleanup);
     }
-  });
-  obs.observe(document.body, { childList: true, subtree: true });
+  }, 2000);
 
   return carousel;
 }

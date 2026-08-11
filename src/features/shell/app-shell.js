@@ -25,6 +25,7 @@ import { renderReports } from '../reports/reports.js';
 import { renderMenuManagement } from '../menu/menu-management.js';
 import { renderSettings } from '../settings/business-settings.js';
 import { showPrinterQuickAccessDialog } from '../printer/usb-printer-widget.js';
+import { showStaffLoginModal } from '../auth/staff-login-modal.js';
 import { renderUnpaidNotif, refreshUnpaidNotif } from '../orders/unpaid-notif.js';
 
 const VIEW_TITLES = {
@@ -77,18 +78,29 @@ export function renderAppShell({ initialView = 'dashboard' } = {}) {
 
   rerender();
 
-  _listeners.push(store.subscribe(CHANNELS.auth, rerender));
+  _listeners.push(store.subscribe(CHANNELS.auth, () => {
+    // Skip the heavy dashboard re-render if a modal is open — the
+    // modal is the current focus, and re-rendering the dashboard
+    // underneath it can wedge the event loop. The unpaid notif and
+    // any open modal will refresh themselves independently.
+    if (!document.querySelector('.modal')) rerender();
+    else refreshUnpaidNotif();
+  }));
   _listeners.push(store.subscribe(CHANNELS.menu, () => {
+    if (document.querySelector('.modal')) return;
     if (_state.view === 'menu' || _state.view === 'new-order' || _state.view === 'dashboard') drawContent(content);
   }));
   _listeners.push(store.subscribe(CHANNELS.orders, () => {
-    if (_state.view === 'orders' || _state.view === 'dashboard' || _state.view === 'reports') drawContent(content);
     refreshUnpaidNotif();
+    if (document.querySelector('.modal')) return;
+    if (_state.view === 'orders' || _state.view === 'dashboard' || _state.view === 'reports') drawContent(content);
   }));
   _listeners.push(store.subscribe(CHANNELS.receipts, () => {
+    if (document.querySelector('.modal')) return;
     if (_state.view === 'reports') drawContent(content);
   }));
   _listeners.push(store.subscribe(CHANNELS.cart, () => {
+    if (document.querySelector('.modal')) return;
     if (_state.view === 'new-order') drawContent(content);
   }));
 
@@ -150,8 +162,20 @@ function drawAppbar(appbar) {
       }, [h('span', { class: 'icon material-symbols-outlined' }, ['logout'])]),
     );
   } else {
-    // Guest: show "Guest" chip; no sign-out button.
+    // Guest: show dedicated "Staff Sign In" button (admins/cashiers
+    // only — the modal filters the dropdown to admin+cashier users,
+    // waiters and other roles can't sign in via this path) AND a
+    // "Guest" chip. The button sits to the LEFT of the chip so it's
+    // prominent and easy to tap when staff walk up to the terminal.
     appbar.append(
+      h('button', {
+        class: 'btn btn--outlined appbar__staff-signin',
+        title: 'Admin / cashier sign in',
+        onclick: () => showStaffLoginModal(),
+      }, [
+        h('span', { class: 'icon material-symbols-outlined', style: { fontSize: '16px' } }, ['lock']),
+        'Sign In',
+      ]),
       h('div', { class: 'appbar__user-chip' }, ['Guest']),
     );
   }

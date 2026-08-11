@@ -19,10 +19,11 @@ async function main() {
   // Seed default users / business profile on first run.
   await SeedService.ensureSeeded();
 
-  // NOTE: we deliberately do NOT restore a previous session here.
-  // The app boots in guest mode (currentUser === null) — no login
-  // screen at startup. Login only happens via the "Complete Sale"
-  // signature flow. See README → "Guest mode + login-as-signature".
+  // Restore a previous admin/cashier session. Only admin + cashier
+  // sessions are restored — waiters are transient (they sign in via
+  // the Complete Sale signature flow and auto-logout after print).
+  // See AuthProvider.restore() for the filtering logic.
+  AuthProvider.restore();
 
   // Register all routes.
   registerRoutes();

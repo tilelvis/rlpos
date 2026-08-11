@@ -8,6 +8,7 @@ import { AuthProvider } from '../../core/providers/auth.js';
 import { store, CHANNELS } from '../../core/store.js';
 import { navigate, currentQuery } from '../../core/router.js';
 import { showLoginModal } from '../auth/login-modal.js';
+import { saleContext } from '../../core/sale-context.js';
 
 /**
  * After a signature-gated action (complete sale, hold), waiters are
@@ -243,11 +244,14 @@ export function renderNewOrder(content) {
       try {
         const order = await OrdersProvider.createFromCart(items);
         const receipt = await OrdersProvider.completeOrder(order.id);
-        // Stash the user for the receipt-preview page to use after
-        // print (it needs to know whose signature to log out, and
-        // whether to show the "you raised X orders today" toast).
-        window.__lastSaleUser = user;
-        window.__lastSaleOrderId = order.id;
+        // Stash the sale context for the receipt-preview page to use
+        // after print (it needs to know whose signature to log out,
+        // and whether to show the "you raised X orders today" toast).
+        // This is the WAITER PATH — the receipt-preview page will
+        // auto-logout waiters after print. Admin/cashier reprints
+        // (from Orders/Reports) don't set saleContext, so they won't
+        // trigger auto-logout.
+        saleContext.set(user, order.id);
         toast(`Sale complete — Receipt #${receipt.receiptNumber}`, { type: 'success' });
         navigate(`/receipts/${receipt.id}`);
       } catch (e) {
