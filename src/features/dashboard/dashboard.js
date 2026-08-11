@@ -115,19 +115,21 @@ export function renderDashboard(content) {
 
   content.append(root);
 
-  // Re-render when menu or orders change.
-  // NOTE: we do NOT subscribe to CHANNELS.auth here — the app shell
-  // already subscribes to auth and calls drawContent() which re-invokes
-  // renderDashboard(). Subscribing here too would cause renderDashboard
-  // to run TWICE per auth change, which during heavy DOM rebuilds can
-  // wedge the event loop.
+  // Re-render when menu or cart changes. The app shell already
+  // subscribes to CHANNELS.orders and CHANNELS.auth and calls
+  // drawContent() which re-invokes renderDashboard(). We do NOT
+  // subscribe to orders or auth here because:
+  //   1. It would cause renderDashboard to run TWICE per change
+  //   2. Worse: subscribing to orders INSIDE renderDashboard (which
+  //      is triggered by an orders bump) adds a new listener to the
+  //      Set DURING iteration — JavaScript's Set iterator visits
+  //      newly-added members, causing an infinite loop that wedges
+  //      the event loop.
   const unsubMenu = store.subscribe(CHANNELS.menu, () => renderDashboard(content));
-  const unsubOrders = store.subscribe(CHANNELS.orders, () => renderDashboard(content));
   const unsubCart = store.subscribe(CHANNELS.cart, () => renderDashboard(content));
   const obs = new MutationObserver(() => {
     if (!content.contains(root)) {
       unsubMenu();
-      unsubOrders();
       unsubCart();
       obs.disconnect();
     }

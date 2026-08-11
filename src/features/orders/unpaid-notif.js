@@ -138,16 +138,17 @@ function openUnpaidOrdersModal() {
 }
 
 /**
- * Opens a modal to confirm payment for a specific order. The admin/
- * cashier must choose a payment type (Cash or M-Pesa Paybill) and
- * optionally enter a reference (e.g. M-Pesa confirmation code) before
- * the order is marked as paid.
+ * Opens a modal to confirm payment for a specific order. SWIFT flow:
+ * the admin/cashier selects the payment type (Cash or M-Pesa) and
+ * taps "Confirm" — that's it. No reference codes, no extra inputs.
+ * The order is immediately marked as paid with the chosen payment
+ * type and the unpaid table updates.
+ *
+ * Receipts are NOT printed here — printing already happened at the
+ * Complete Sale step. This modal only records HOW the order was paid.
  */
 function openConfirmPaymentModal(order, user, onConfirmed) {
-  const state = {
-    paymentType: 'cash',   // 'cash' | 'mpesa'
-    paymentRef: '',         // optional M-Pesa confirmation code
-  };
+  let _paymentType = 'cash'; // 'cash' | 'mpesa'
 
   const body = h('div', {}, []);
   function refresh() {
@@ -169,57 +170,28 @@ function openConfirmPaymentModal(order, user, onConfirmed) {
       ]),
 
       h('p', { style: { color: 'var(--muted)', fontSize: '13px', margin: '0 0 12px' } }, [
-        'How was this payment received? Choose the payment type below. This is recorded on the order for your records.',
+        'How was this payment received?',
       ]),
 
-      // Payment type dropdown
-      h('div', { class: 'field' }, [
-        h('label', {}, ['Payment type']),
-        h('div', { style: { display: 'flex', gap: '8px' } }, [
-          h('button', {
-            class: `chip ${state.paymentType === 'cash' ? 'active' : ''}`,
-            style: { flex: '1', justifyContent: 'center', padding: '10px' },
-            onclick: () => { state.paymentType = 'cash'; refresh(); },
-          }, [
-            h('span', { class: 'icon material-symbols-outlined', style: { fontSize: '16px' } }, ['payments']),
-            'Cash',
-          ]),
-          h('button', {
-            class: `chip ${state.paymentType === 'mpesa' ? 'active' : ''}`,
-            style: { flex: '1', justifyContent: 'center', padding: '10px' },
-            onclick: () => { state.paymentType = 'mpesa'; refresh(); },
-          }, [
-            h('span', { class: 'icon material-symbols-outlined', style: { fontSize: '16px' } }, ['phone_iphone']),
-            'M-Pesa Paybill',
-          ]),
+      // Payment type selector — two large chips, tap to select
+      h('div', { style: { display: 'flex', gap: '8px' } }, [
+        h('button', {
+          class: `chip ${_paymentType === 'cash' ? 'active' : ''}`,
+          style: { flex: '1', justifyContent: 'center', padding: '14px', fontSize: '15px' },
+          onclick: () => { _paymentType = 'cash'; refresh(); },
+        }, [
+          h('span', { class: 'icon material-symbols-outlined', style: { fontSize: '18px' } }, ['payments']),
+          'Cash',
+        ]),
+        h('button', {
+          class: `chip ${_paymentType === 'mpesa' ? 'active' : ''}`,
+          style: { flex: '1', justifyContent: 'center', padding: '14px', fontSize: '15px' },
+          onclick: () => { _paymentType = 'mpesa'; refresh(); },
+        }, [
+          h('span', { class: 'icon material-symbols-outlined', style: { fontSize: '18px' } }, ['phone_iphone']),
+          'M-Pesa',
         ]),
       ]),
-
-      // Reference (optional for cash, recommended for M-Pesa)
-      state.paymentType === 'mpesa'
-        ? h('div', { class: 'field' }, [
-            h('label', {}, ['M-Pesa confirmation code (optional)']),
-            h('input', {
-              class: 'input',
-              type: 'text',
-              placeholder: 'e.g. QGH7XK2P9L',
-              value: state.paymentRef,
-              oninput: (e) => { state.paymentRef = e.target.value; },
-            }),
-            h('p', { style: { fontSize: '11px', color: 'var(--muted)', margin: '4px 0 0' } }, [
-              'Enter the M-Pesa confirmation code if available. This helps reconcile payments later.',
-            ]),
-          ])
-        : h('div', { class: 'field' }, [
-            h('label', {}, ['Cash received by (optional note)']),
-            h('input', {
-              class: 'input',
-              type: 'text',
-              placeholder: 'e.g. Exact change',
-              value: state.paymentRef,
-              oninput: (e) => { state.paymentRef = e.target.value; },
-            }),
-          ]),
     );
   }
   refresh();
@@ -236,10 +208,7 @@ function openConfirmPaymentModal(order, user, onConfirmed) {
     h('button', {
       class: 'btn btn--filled',
       onclick: () => {
-        // Capture state before closing (the close triggers DOM changes
-        // that might invalidate references).
-        const paymentType = state.paymentType;
-        const paymentRef = state.paymentRef.trim() || null;
+        const paymentType = _paymentType;
         const orderId = order.id;
         const orderNum = order.orderNumber;
         const cb = onConfirmed;
@@ -247,13 +216,11 @@ function openConfirmPaymentModal(order, user, onConfirmed) {
         // Close THIS modal first.
         dlg.close();
 
-        // Defer the markPaid call to the next event-loop tick. This
-        // ensures the modal's close animation has started and the
-        // browser has a chance to paint before we trigger the orders
-        // store bump (which causes the dashboard to re-render).
+        // Defer markPaid so the modal close animation can start before
+        // the orders store bump triggers a dashboard re-render.
         setTimeout(async () => {
           try {
-            await OrdersProvider.markPaid(orderId, user, { paymentType, paymentRef });
+            await OrdersProvider.markPaid(orderId, user, { paymentType });
             const payLabel = paymentType === 'mpesa' ? 'M-Pesa' : 'Cash';
             toast(`Confirmed ${orderNum} as paid via ${payLabel}.`, { type: 'success' });
             if (cb) cb();
@@ -264,7 +231,7 @@ function openConfirmPaymentModal(order, user, onConfirmed) {
       },
     }, [
       h('span', { class: 'icon material-symbols-outlined', style: { fontSize: '16px' } }, ['check']),
-      'Confirm payment',
+      'Confirm',
     ]),
   );
 }
