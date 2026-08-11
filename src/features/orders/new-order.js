@@ -49,11 +49,8 @@ export function renderNewOrder(content) {
       drawMenuGrid();
     },
   });
-  const chipRow = h('div', {
-    style: { display: 'flex', gap: '6px', padding: '0 12px 4px', overflowX: 'auto' },
-  }, []);
   const menuGrid = h('div', { class: 'menu-grid' }, []);
-  menuSide.append(searchBar, chipRow, menuGrid);
+  menuSide.append(searchBar, menuGrid);
 
   // ----- Cart side -----
   const cartSide = h('div', { class: 'new-order-cart' }, []);
@@ -76,41 +73,39 @@ export function renderNewOrder(content) {
   content.appendChild(wrap);
 
   // ----- Drawing helpers -----
-  function drawChipRow() {
-    clear(chipRow);
-    const cats = MenuProvider.categories;
-    chipRow.appendChild(makeChip('All', null));
-    for (const c of cats) {
-      chipRow.appendChild(makeChip(c.name, c.id));
-    }
-  }
-
-  function makeChip(label, id) {
-    const selected = _selectedCategoryId === id;
-    return h('button', {
-      class: `chip ${selected ? 'active' : ''}`,
-      onclick: () => {
-        _selectedCategoryId = selected ? null : id;
-        drawChipRow();
-        drawMenuGrid();
-      },
-    }, [label]);
-  }
-
+  // The menu area has two "screens": a grid of category cards, and (once
+  // a category is tapped, or a search is entered) a grid of items. There
+  // is no persistent category strip — categories ARE the first screen.
   function drawMenuGrid() {
     clear(menuGrid);
+    const searching = _searchQuery.trim().length > 0;
+
+    if (!searching && !_selectedCategoryId) {
+      drawCategoryGrid();
+      return;
+    }
+
     const items = MenuProvider.filtered({
-      categoryId: _selectedCategoryId,
+      // While searching, search across every category regardless of
+      // whether one is currently selected.
+      categoryId: searching ? null : _selectedCategoryId,
       query: _searchQuery,
     });
+
+    if (!searching) {
+      menuGrid.appendChild(drawBackRow());
+    }
+
     if (items.length === 0) {
       menuGrid.appendChild(
         h('div', { class: 'empty-state', style: { gridColumn: '1 / -1' } }, [
-          'No items match your search.',
+          searching ? 'No items match your search.' : 'No items in this category yet.',
         ]),
       );
       return;
     }
+
+    const itemsGrid = h('div', { class: 'menu-grid__items' }, []);
     for (const item of items) {
       const tile = h('div', { class: 'menu-tile', onclick: () => CartProvider.addItem(item) }, []);
       const photo = h('div', { class: 'menu-tile__photo' }, []);
@@ -128,8 +123,70 @@ export function renderNewOrder(content) {
           h('span', { class: 'icon material-symbols-outlined', style: { color: 'var(--primary)' } }, ['add_circle']),
         ]),
       );
-      menuGrid.appendChild(tile);
+      itemsGrid.appendChild(tile);
     }
+    menuGrid.appendChild(itemsGrid);
+  }
+
+  /** Header shown above the item grid: back-to-categories + category name. */
+  function drawBackRow() {
+    const cat = MenuProvider.categories.find((c) => c.id === _selectedCategoryId);
+    return h('div', { class: 'menu-back-row' }, [
+      h('button', {
+        class: 'btn btn--text menu-back-row__btn',
+        onclick: () => {
+          _selectedCategoryId = null;
+          drawMenuGrid();
+        },
+      }, [
+        h('span', { class: 'icon material-symbols-outlined', style: { fontSize: '18px' } }, ['arrow_back']),
+        'Categories',
+      ]),
+      h('span', { class: 'menu-back-row__name' }, [cat ? cat.name : 'Items']),
+    ]);
+  }
+
+  /** First screen: a grid of category cards. Tapping one drills into its items. */
+  function drawCategoryGrid() {
+    const cats = MenuProvider.categories;
+    if (cats.length === 0) {
+      menuGrid.appendChild(
+        h('div', { class: 'empty-state', style: { gridColumn: '1 / -1' } }, [
+          'No categories yet. Go to Menu → Categories to create one.',
+        ]),
+      );
+      return;
+    }
+
+    const catGrid = h('div', { class: 'menu-grid__items' }, []);
+    for (const c of cats) {
+      const count = MenuProvider.filtered({ categoryId: c.id }).length;
+      const hex = '#' + (c.colorValue & 0xffffff).toString(16).padStart(6, '0');
+      const tile = h('div', {
+        class: 'menu-tile menu-tile--category',
+        onclick: () => {
+          _selectedCategoryId = c.id;
+          drawMenuGrid();
+        },
+      }, []);
+      const photo = h('div', { class: 'menu-tile__photo', style: { background: c.hasPhoto ? undefined : hex } }, []);
+      if (c.hasPhoto) {
+        photo.appendChild(h('img', { src: c.photoBase64, alt: c.name }));
+      } else {
+        photo.style.color = '#fff';
+        photo.textContent = c.name.charAt(0).toUpperCase();
+      }
+      tile.append(
+        photo,
+        h('div', { class: 'menu-tile__name' }, [c.name]),
+        h('div', { class: 'menu-tile__row' }, [
+          h('span', { class: 'menu-tile__count' }, [`${count} item${count === 1 ? '' : 's'}`]),
+          h('span', { class: 'icon material-symbols-outlined', style: { color: 'var(--primary)' } }, ['chevron_right']),
+        ]),
+      );
+      catGrid.appendChild(tile);
+    }
+    menuGrid.appendChild(catGrid);
   }
 
   function drawCart() {
@@ -266,15 +323,11 @@ export function renderNewOrder(content) {
   }
 
   // ----- Initial render + subscribe to store changes -----
-  drawChipRow();
   drawMenuGrid();
   drawCart();
 
   // Subscribe so the grid + cart rebuild when menu/cart change.
-  const unsubMenu = store.subscribe(CHANNELS.menu, () => {
-    drawChipRow();
-    drawMenuGrid();
-  });
+  const unsubMenu = store.subscribe(CHANNELS.menu, drawMenuGrid);
   const unsubCart = store.subscribe(CHANNELS.cart, drawCart);
 
   // Clean up subscriptions when the content node is removed.

@@ -599,12 +599,41 @@ a:hover { text-decoration: underline; }
 
 /* --- Menu grid --- */
 .menu-grid {
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  flex: 1;
+}
+.menu-grid__items {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
   gap: 10px;
   padding: 12px;
-  overflow-y: auto;
-  flex: 1;
+}
+/* Back-to-categories header shown above an item grid. */
+.menu-back-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px 0;
+}
+.menu-back-row__btn { padding: 4px 8px; flex-shrink: 0; }
+.menu-back-row__name {
+  font-weight: 700;
+  color: var(--ink);
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.menu-tile--category .menu-tile__photo {
+  font-size: 32px;
+  font-weight: 800;
+}
+.menu-tile__count {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
 }
 .menu-tile {
   background: var(--surface);
