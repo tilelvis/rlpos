@@ -68,7 +68,7 @@ jobs:
           node-version: 20
 
       - name: Install npm dependencies
-        run: npm ci
+        run: npm install
 
       # No separate "npm run build" step here on purpose: `cargo tauri
       # build` below runs it automatically via tauri.conf.json's
