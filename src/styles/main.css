@@ -37,7 +37,7 @@ html, body {
   font-family: var(--font-sans);
   font-size: 14px;
   line-height: 1.5;
-  min-height: 100vh;
+  height: 100%;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -45,7 +45,15 @@ html, body {
 body {
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
+  height: 100vh;
+  /* The app shell manages its own internal scroll regions (menu grid,
+     cart list, tab panels, etc). Locking the page itself to the
+     viewport height means those regions actually get a bounded box to
+     scroll within, instead of the whole page growing and forcing the
+     user to scroll past everything (e.g. every cart item) just to
+     reach controls pinned at the bottom of a panel, like the cart's
+     total/print bar. */
+  overflow: hidden;
 }
 
 button { font-family: inherit; cursor: pointer; }
@@ -53,7 +61,23 @@ input, select, textarea { font-family: inherit; }
 a { color: var(--primary); text-decoration: none; }
 a:hover { text-decoration: underline; }
 
-#app { flex: 1; display: flex; flex-direction: column; min-height: calc(100vh - var(--header-h)); }
+#app { flex: 1; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+
+/* Root shell (appbar + content + bottomnav) fills #app so that
+   .app-shell__content gets a real bounded height to hand down to
+   whichever page is mounted inside it. */
+.app-shell {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  width: 100%;
+  overflow: hidden;
+}
+/* Fallback scroll for any page that doesn't manage its own internal
+   scroll region — pages that do (new-order, dashboard, tab-content
+   panels) handle scrolling themselves and won't double-scroll. */
+.app-shell__content { overflow-y: auto; }
 
 /* --- Buttons --- */
 .btn {
@@ -559,7 +583,18 @@ a:hover { text-decoration: underline; }
 }
 @media (max-width: 920px) {
   .new-order-wrap { flex-direction: column; }
-  .new-order-cart { width: 100%; border-left: 0; border-top: 1px solid var(--divider); }
+  .new-order-cart {
+    width: 100%;
+    border-left: 0;
+    border-top: 1px solid var(--divider);
+    /* Cap the cart panel instead of letting it grow with every added
+       item — the cart-list scrolls inside this box so the total and
+       Complete Sale/print button stay pinned and reachable. */
+    flex: 1 1 55%;
+    min-height: 0;
+    max-height: 60vh;
+  }
+  .new-order-menu { flex: 1 1 auto; min-height: 0; }
 }
 
 /* --- Menu grid --- */
@@ -660,6 +695,11 @@ a:hover { text-decoration: underline; }
   display: flex;
   align-items: baseline;
   gap: 12px;
+  /* Pinned above the scrollable cart-list, floating over the items
+     below it rather than being pushed off-screen by them. */
+  position: relative;
+  z-index: 1;
+  box-shadow: 0 -4px 10px rgba(0,0,0,0.05);
 }
 .cart-summary__label {
   color: var(--muted);
@@ -678,6 +718,9 @@ a:hover { text-decoration: underline; }
   padding: 8px 12px 16px;
   display: flex;
   gap: 8px;
+  background: var(--surface);
+  position: relative;
+  z-index: 1;
 }
 
 /* --- Receipt preview --- */
@@ -780,7 +823,7 @@ a:hover { text-decoration: underline; }
   color: var(--primary);
   border-bottom-color: var(--primary);
 }
-.tab-content { padding: 16px; overflow-y: auto; flex: 1; }
+.tab-content { padding: 16px; overflow-y: auto; flex: 1; min-height: 0; }
 
 /* --- Generic grid helpers --- */
 .grid-2 {
