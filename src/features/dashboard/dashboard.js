@@ -1,4 +1,4 @@
-// Dashboard — hero carousel + summary bar + recent orders.
+// Dashboard — hero carousel + summary bar.
 //
 // Layout (top to bottom):
 //   1. Hero carousel — auto-rotating featured category every 5s with
@@ -7,12 +7,10 @@
 //      CTA overlaid at the bottom. Pagination dots + tap to navigate.
 //   2. Slim summary bar (categories, items, orders today, sales today
 //      for admin/cashier).
-//   3. (Admin/cashier only) Recent orders list with Paid/Unpaid badges.
 
 import { h, clear, formatMoney, formatMoney0, formatDate } from '../../core/ui.js';
 import { MenuProvider } from '../../core/providers/menu.js';
 import { OrdersProvider } from '../../core/providers/orders.js';
-import { ReceiptsProvider } from '../../core/providers/receipts.js';
 import { AuthProvider } from '../../core/providers/auth.js';
 import { store, CHANNELS } from '../../core/store.js';
 import { navigate } from '../../core/router.js';
@@ -61,11 +59,6 @@ export function renderDashboard(content) {
     );
   }
   root.append(summary);
-
-  // -------- 3. Recent orders (admin/cashier only) --------
-  if (canSeeFinancials) {
-    root.append(renderRecentOrders(completed));
-  }
 
   content.append(root);
 
@@ -218,61 +211,6 @@ function renderCarousel(categories) {
   }, 2000);
 
   return carousel;
-}
-
-// ------------------ Recent orders ------------------
-
-function renderRecentOrders(completed) {
-  const section = h('div', { style: { padding: '16px', maxWidth: '1100px', margin: '0 auto', width: '100%' } }, [
-    h('h2', { class: 'section-title', style: { margin: '0 0 8px' } }, ['Recent Orders']),
-  ]);
-
-  if (completed.length === 0) {
-    section.append(
-      h('div', { class: 'card' }, [
-        h('div', { class: 'list-item' }, [
-          h('div', { class: 'list-item__avatar' }, [
-            h('span', { class: 'icon material-symbols-outlined' }, ['info']),
-          ]),
-          h('div', { class: 'list-item__main' }, [
-            h('div', { class: 'list-item__title' }, ['No sales yet']),
-            h('div', { class: 'list-item__subtitle' }, ['Tap a category above to ring up your first order.']),
-          ]),
-        ]),
-      ]),
-    );
-    return section;
-  }
-
-  const card = h('div', { class: 'card', style: { padding: '0' } }, []);
-  for (const o of completed.slice(0, 5)) {
-    const receipt = ReceiptsProvider.findByOrderId(o.id);
-    card.append(
-      h('div', {
-        class: 'list-item',
-        onclick: () => receipt && navigate(`/receipts/${receipt.id}`),
-      }, [
-        h('div', { class: 'list-item__avatar' }, [
-          h('span', { class: 'icon material-symbols-outlined' }, ['receipt']),
-        ]),
-        h('div', { class: 'list-item__main' }, [
-          h('div', { class: 'list-item__title' }, [
-            h('strong', {}, [o.orderNumber]),
-            h('span', {
-              class: `tag ${o.paid ? 'tag--paid' : 'tag--unpaid'}`,
-              style: { marginLeft: '8px' },
-            }, [o.paid ? 'Paid' : 'Unpaid']),
-          ]),
-          h('div', { class: 'list-item__subtitle' }, [
-            `${formatDate(o.completedAt)} · ${o.cashierName} · ${o.itemCount} items`,
-          ]),
-        ]),
-        h('div', { class: 'list-item__trailing' }, [formatMoney(o.total)]),
-      ]),
-    );
-  }
-  section.append(card);
-  return section;
 }
 
 // ------------------ Helpers ------------------
