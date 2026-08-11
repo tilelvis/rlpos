@@ -1,4 +1,4 @@
-// Dashboard — hero carousel + 3×n category grid + quick-selection rows.
+// Dashboard — hero carousel + summary bar + recent orders.
 //
 // Layout (top to bottom):
 //   1. Hero carousel — auto-rotating featured category every 5s with
@@ -7,16 +7,10 @@
 //      CTA overlaid at the bottom. Pagination dots + tap to navigate.
 //   2. Slim summary bar (categories, items, orders today, sales today
 //      for admin/cashier).
-//   3. "Quick add" row — horizontally scrollable chips of every
-//      available menu item, tap to add straight to cart (no navigation).
-//   4. "Popular today" row — top 4 most-sold items today, with photo,
-//      name, qty sold, and a quick-add button.
-//   5. 3×n category grid — 9:16 portrait cards with image background,
-//      name + count overlaid at bottom.
-//   6. (Admin/cashier only) Recent orders list with Paid/Unpaid badges.
+//   3. (Admin/cashier only) Recent orders list with Paid/Unpaid badges.
 
-import { h, clear, formatMoney, formatMoney0, formatDate, toast } from '../../core/ui.js';
-import { MenuProvider, CartProvider } from '../../core/providers/menu.js';
+import { h, clear, formatMoney, formatMoney0, formatDate } from '../../core/ui.js';
+import { MenuProvider } from '../../core/providers/menu.js';
 import { OrdersProvider } from '../../core/providers/orders.js';
 import { ReceiptsProvider } from '../../core/providers/receipts.js';
 import { AuthProvider } from '../../core/providers/auth.js';
@@ -43,7 +37,6 @@ export function renderDashboard(content) {
 
   const cats = MenuProvider.categories;
   const allItems = MenuProvider.items;
-  const availableItems = allItems.filter((i) => i.available);
 
   const root = h('div', { style: { display: 'flex', flexDirection: 'column', flex: '1', minHeight: '0', overflowY: 'auto' } }, []);
 
@@ -69,46 +62,7 @@ export function renderDashboard(content) {
   }
   root.append(summary);
 
-  // -------- 3. Quick-add chips --------
-  if (availableItems.length > 0) {
-    root.append(renderQuickAddRow(availableItems));
-  }
-
-  // -------- 4. Popular today --------
-  const popular = computePopularToday(completed);
-  if (popular.length > 0) {
-    root.append(renderPopularRow(popular));
-  }
-
-  // -------- 5. Category grid header + grid --------
-  root.append(
-    h('div', { style: { padding: '16px 16px 0', maxWidth: '1100px', margin: '0 auto', width: '100%' } }, [
-      h('h2', { class: 'section-title', style: { margin: '0 0 4px' } }, ['Categories']),
-      h('p', { style: { color: 'var(--muted)', fontSize: '12px', margin: '0' } }, [
-        'Tap a category to start a new sale with that category pre-selected.',
-      ]),
-    ]),
-  );
-
-  const grid = h('div', { class: 'category-grid' }, []);
-  if (cats.length === 0) {
-    grid.append(
-      h('div', { class: 'empty-state', style: { gridColumn: '1 / -1' } }, [
-        'No categories yet.',
-        h('br'),
-        canSeeFinancials && user?.isAdmin
-          ? 'Go to Menu → Categories to create your first category.'
-          : 'Ask an admin to set up the menu.',
-      ]),
-    );
-  } else {
-    for (const c of cats) {
-      grid.append(renderCategoryCard(c, allItems));
-    }
-  }
-  root.append(grid);
-
-  // -------- 6. Recent orders (admin/cashier only) --------
+  // -------- 3. Recent orders (admin/cashier only) --------
   if (canSeeFinancials) {
     root.append(renderRecentOrders(completed));
   }
@@ -264,151 +218,6 @@ function renderCarousel(categories) {
   }, 2000);
 
   return carousel;
-}
-
-// ------------------ Quick-add row ------------------
-
-function renderQuickAddRow(items) {
-  const row = h('div', { class: 'quick-add-row' }, []);
-  for (const item of items) {
-    const chip = h('button', {
-      class: 'quick-add-chip',
-      onclick: () => {
-        CartProvider.addItem(item);
-        toast(`Added ${item.name} to cart`, { type: 'success', duration: 1200 });
-      },
-    }, [
-      h('span', { class: 'quick-add-chip__name' }, [item.name]),
-      h('span', { class: 'quick-add-chip__price' }, [formatMoney0(item.price)]),
-      h('span', { class: 'icon material-symbols-outlined', style: { fontSize: '16px' } }, ['add']),
-    ]);
-    row.appendChild(chip);
-  }
-
-  return h('div', { class: 'quick-add-section' }, [
-    h('div', { class: 'quick-add-header' }, [
-      h('span', { class: 'section-title', style: { margin: '0' } }, ['Quick add']),
-      h('span', { style: { color: 'var(--muted)', fontSize: '12px' } }, ['Tap to add to cart']),
-    ]),
-    row,
-  ]);
-}
-
-// ------------------ Popular today ------------------
-
-function computePopularToday(completedOrders) {
-  // Aggregate item sales for today only.
-  const now = new Date();
-  const today = completedOrders.filter((o) => {
-    if (!o.completedAt) return false;
-    const c = new Date(o.completedAt);
-    return c.getFullYear() === now.getFullYear() &&
-           c.getMonth() === now.getMonth() &&
-           c.getDate() === now.getDate();
-  });
-
-  const totals = new Map();
-  for (const o of today) {
-    for (const it of o.items) {
-      const cur = totals.get(it.menuItemId) ?? { item: null, qty: 0, revenue: 0 };
-      if (!cur.item) {
-        const m = MenuProvider.items.find((x) => x.id === it.menuItemId);
-        if (!m) continue;
-        cur.item = m;
-      }
-      cur.qty += it.quantity;
-      cur.revenue += it.lineTotal;
-      totals.set(it.menuItemId, cur);
-    }
-  }
-  return [...totals.values()]
-    .filter((x) => x.item)
-    .sort((a, b) => b.qty - a.qty)
-    .slice(0, 4);
-}
-
-function renderPopularRow(popular) {
-  const cards = popular.map((p) => {
-    const card = h('div', {
-      class: 'popular-card',
-      onclick: () => {
-        CartProvider.addItem(p.item);
-        toast(`Added ${p.item.name} to cart`, { type: 'success', duration: 1200 });
-      },
-    }, []);
-
-    const photo = h('div', { class: 'popular-card__photo' }, []);
-    if (p.item.hasPhoto) {
-      photo.style.backgroundImage = `url(${p.item.photoBase64})`;
-    } else {
-      photo.style.background = 'linear-gradient(135deg, var(--bg), var(--divider))';
-      photo.style.color = 'var(--muted)';
-      photo.textContent = p.item.name.charAt(0).toUpperCase();
-    }
-    card.append(
-      photo,
-      h('div', { class: 'popular-card__body' }, [
-        h('div', { class: 'popular-card__name' }, [p.item.name]),
-        h('div', { class: 'popular-card__meta' }, [
-          h('span', { class: 'tag tag--success', style: { marginRight: '6px' } }, [`${p.qty} sold`]),
-          h('span', { style: { color: 'var(--primary)', fontWeight: 700 } }, [formatMoney0(p.item.price)]),
-        ]),
-      ]),
-    );
-    return card;
-  });
-
-  return h('div', { class: 'popular-section' }, [
-    h('div', { class: 'popular-header' }, [
-      h('span', { class: 'section-title', style: { margin: '0' } }, ['Popular today']),
-      h('span', { style: { color: 'var(--muted)', fontSize: '12px' } }, ['Tap to add to cart']),
-    ]),
-    h('div', { class: 'popular-grid' }, cards),
-  ]);
-}
-
-// ------------------ Category card (9:16 portrait) ------------------
-
-function renderCategoryCard(cat, allItems) {
-  const items = allItems.filter((m) => m.categoryId === cat.id);
-  const availableCount = items.filter((m) => m.available).length;
-  const hex = '#' + (cat.colorValue & 0xffffff).toString(16).padStart(6, '0');
-
-  const card = h('div', {
-    class: 'category-card',
-    onclick: () => navigate(`/orders/new?cat=${cat.id}`),
-  }, []);
-
-  // Photo (9:16 aspect, full-bleed)
-  const photo = h('div', { class: 'category-card__photo' }, []);
-  if (cat.hasPhoto) {
-    photo.style.backgroundImage = `url(${cat.photoBase64})`;
-  } else {
-    photo.style.background = `linear-gradient(160deg, ${hex}cc, ${hex}33)`;
-    photo.style.color = '#fff';
-    photo.textContent = (cat.name.charAt(0) || '?').toUpperCase();
-  }
-  card.appendChild(photo);
-
-  // Item-count chip floating at top-right
-  card.appendChild(
-    h('div', { class: 'category-card__count' }, [
-      h('span', { class: 'icon material-symbols-outlined', style: { fontSize: '12px' } }, ['inventory_2']),
-      `${availableCount}/${items.length}`,
-    ]),
-  );
-
-  // Bottom overlay with name + meta (gradient scrim for readability)
-  card.appendChild(
-    h('div', { class: 'category-card__overlay' }, [
-      h('div', { class: 'category-card__name' }, [cat.name]),
-      h('div', { class: 'category-card__meta' }, [
-        `${availableCount} available`,
-      ]),
-    ]),
-  );
-
-  return card;
 }
 
 // ------------------ Recent orders ------------------
