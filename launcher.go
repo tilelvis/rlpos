@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"syscall"
 	"time"
 )
 
@@ -26,6 +27,11 @@ func main() {
 	server.Stdout = nil
 	server.Stderr = nil
 	server.Stdin = nil
+
+	// Hide the server console window.
+	server.SysProcAttr = &syscall.SysProcAttr{
+		HideWindow: true,
+	}
 
 	_ = server.Start()
 
