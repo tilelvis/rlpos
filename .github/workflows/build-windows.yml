@@ -61,33 +61,70 @@ jobs:
         run: |
           go install github.com/tc-hib/go-winres@latest
 
-      - name: Embed Raicilabs POS icon
+      - name: Prepare Windows launcher
         shell: pwsh
+        run: |
+          if (!(Test-Path "windows-launcher")) {
+            New-Item -ItemType Directory -Force -Path "windows-launcher" | Out-Null
+          }
+
+          @"
+          module raicilabs-pos-launcher
+
+          go 1.23
+          "@ | Set-Content -Path "windows-launcher/go.mod" -Encoding UTF8
+
+          Copy-Item -Force "launcher.go" "windows-launcher/launcher.go"
+          Copy-Item -Force "raicilabs-pos.ico" "windows-launcher/raicilabs-pos.ico"
+
+          Write-Host "Windows launcher prepared."
+
+      - name: Generate Windows icon resource
+        shell: pwsh
+        working-directory: windows-launcher
         run: |
           go-winres simply --icon "raicilabs-pos.ico" --manifest gui
 
-          if (!(Test-Path "rsrc_windows_amd64.syso")) {
-            Write-Error "Windows resource file was not created."
+          $resource = Get-ChildItem -Filter "*.syso" | Select-Object -First 1
+
+          if ($null -eq $resource) {
+            Write-Error "Windows icon resource was not created."
             exit 1
           }
 
-          Write-Host "Raicilabs POS icon embedded successfully."
+          Write-Host "Windows resource created:"
+          Write-Host $resource.FullName
 
       - name: Build Windows POS launcher
         shell: pwsh
+        working-directory: windows-launcher
         run: |
           $env:GOOS = "windows"
           $env:GOARCH = "amd64"
           $env:CGO_ENABLED = "0"
 
-          go build -ldflags="-H=windowsgui -s -w" -o "RaicilabsPOS.exe" launcher.go
+          go build -ldflags="-H=windowsgui -s -w" -o "../RaicilabsPOS.exe" .
 
-          if (!(Test-Path "RaicilabsPOS.exe")) {
+          if (!(Test-Path "../RaicilabsPOS.exe")) {
             Write-Error "RaicilabsPOS.exe was not created."
             exit 1
           }
 
           Write-Host "RaicilabsPOS.exe created successfully."
+
+      - name: Verify launcher
+        shell: pwsh
+        run: |
+          if (!(Test-Path "RaicilabsPOS.exe")) {
+            Write-Error "Launcher executable is missing."
+            exit 1
+          }
+
+          $file = Get-Item "RaicilabsPOS.exe"
+
+          Write-Host "Launcher:"
+          Write-Host "Name: $($file.Name)"
+          Write-Host "Size: $($file.Length) bytes"
 
       - name: Create portable POS package
         shell: pwsh
