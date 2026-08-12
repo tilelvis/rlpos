@@ -80,7 +80,7 @@ jobs:
           $env:GOARCH = "amd64"
           $env:CGO_ENABLED = "0"
 
-          go build -ldflags="-H=windowsgui -s -w" -o "RaicilabsPOS.exe" .
+          go build -ldflags="-H=windowsgui -s -w" -o "RaicilabsPOS.exe" launcher.go
 
           if (!(Test-Path "RaicilabsPOS.exe")) {
             Write-Error "RaicilabsPOS.exe was not created."
