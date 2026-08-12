@@ -16,10 +16,8 @@ const port = "8080"
 func openPOS() {
 	url := "http://127.0.0.1:" + port + "/#/dashboard"
 
-	// Give the HTTP server a moment to start.
 	time.Sleep(800 * time.Millisecond)
 
-	// Prefer Microsoft Edge app mode.
 	edgePaths := []string{
 		`C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe`,
 		`C:\Program Files\Microsoft\Edge\Application\msedge.exe`,
@@ -39,7 +37,6 @@ func openPOS() {
 		}
 	}
 
-	// Fall back to Chrome app mode.
 	chromePaths := []string{
 		`C:\Program Files\Google\Chrome\Application\chrome.exe`,
 		`C:\Program Files (x86)\Google\Chrome\Application\chrome.exe`,
@@ -59,12 +56,29 @@ func openPOS() {
 		}
 	}
 
-	// Final fallback: Windows default browser.
+	cmd := exec.Command(
+		"cmd",
+		"/c",
+		"start",
+		"",
+		url,
+	)
+
+	_ = cmd.Start()
+}
+
+func main() {
+	exePath, err := os.Executable()
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	baseDir := filepath.Dir(exePath)
 	appDir := filepath.Join(baseDir, "app")
 
-	if _, err := os.Stat(filepath.Join(appDir, "index.html")); err != nil {
+	indexFile := filepath.Join(appDir, "index.html")
+
+	if _, err := os.Stat(indexFile); err != nil {
 		log.Fatalf("POS application not found: %s", appDir)
 	}
 
@@ -76,23 +90,21 @@ func openPOS() {
 			return
 		}
 
-		path := filepath.Clean(r.URL.Path)
-		path = strings.TrimPrefix(path, "/")
-
-		if path == "" {
-			path = "index.html"
+		}
+		if info, err := os.Stat(filePath); err != nil || info.IsDir() {
+			filePath = indexFile
 		}
 
-		filePath := filepath.Join(
-			appDir,
-			filepath.FromSlash(path),
-		)
+		http.ServeFile(w, r, filePath)
+	})
 
-		// Prevent path traversal.
-		rel, err := filepath.Rel(appDir, filePath)
+	http.Handle("/", handler)
 
-		if err != nil || strings.HasPrefix(rel, "..") {
-			http.Error(w, "Forbidden", http.StatusForbidden)
+	address := "127.0.0.1:" + port
+
+	fmt.Println("====================================")
+	fmt.Println("          RAICILABS POS")
+	fmt.Println("====================================")
 	fmt.Println()
 	fmt.Println("Running offline at:")
 	fmt.Println("http://" + address)
@@ -103,36 +115,22 @@ func openPOS() {
 	go openPOS()
 
 	log.Fatal(http.ListenAndServe(address, nil))
-}	fmt.Println("====================================")
-	fmt.Println("          RAICILABS POS")
-	fmt.Println("====================================")
-			return
-	address := "127.0.0.1:" + port
-
-
-	http.Handle("/", handler)
-
-
-		http.ServeFile(w, r, filePath)
-	})
-		}
-			filePath = filepath.Join(appDir, "index.html")
-		}
-
-		// Support SPA routing.
-		if info, err := os.Stat(filePath); err != nil || info.IsDir() {
-		log.Fatal(err)
-	}
-
-func main() {
-	exePath, err := os.Executable()
-	if err != nil {
-	cmd := exec.Command(
-		"cmd",
 }
-		"/c",
+		// If the requested file does not exist, serve index.html.
+		// This supports the SPA hash routing.
+		if err != nil || strings.HasPrefix(rel, "..") {
+			http.Error(w, "Forbidden", http.StatusForbidden)
+			return
+		path := filepath.Clean(r.URL.Path)
+		// Prevent path traversal.
+		rel, err := filepath.Rel(appDir, filePath)
+		path = strings.TrimPrefix(path, "/")
 
-	_ = cmd.Start()
-		"start",
-		"",
-		url,
+
+		if path == "" {
+			filepath.FromSlash(path),
+		)
+
+		filePath := filepath.Join(
+			appDir,
+
