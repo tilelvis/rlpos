@@ -56,6 +56,23 @@ jobs:
 
           Write-Host "server.exe created successfully."
 
+      - name: Install go-winres
+        shell: pwsh
+        run: |
+          go install github.com/tc-hib/go-winres@latest
+
+      - name: Embed Raicilabs POS icon
+        shell: pwsh
+        run: |
+          go-winres simply --icon "raicilabs-pos.ico" --manifest gui
+
+          if (!(Test-Path "rsrc_windows_amd64.syso")) {
+            Write-Error "Windows resource file was not created."
+            exit 1
+          }
+
+          Write-Host "Raicilabs POS icon embedded successfully."
+
       - name: Build Windows POS launcher
         shell: pwsh
         run: |
@@ -63,7 +80,7 @@ jobs:
           $env:GOARCH = "amd64"
           $env:CGO_ENABLED = "0"
 
-          go build -ldflags="-H=windowsgui -s -w" -o "RaicilabsPOS.exe" launcher.go
+          go build -ldflags="-H=windowsgui -s -w" -o "RaicilabsPOS.exe" .
 
           if (!(Test-Path "RaicilabsPOS.exe")) {
             Write-Error "RaicilabsPOS.exe was not created."
