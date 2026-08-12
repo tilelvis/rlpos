@@ -56,14 +56,32 @@ jobs:
 
           Write-Host "server.exe created successfully."
 
+      - name: Build Windows POS launcher
+        shell: pwsh
+        run: |
+          $env:GOOS = "windows"
+          $env:GOARCH = "amd64"
+          $env:CGO_ENABLED = "0"
+
+          go build -ldflags="-H=windowsgui -s -w" -o "RaicilabsPOS.exe" launcher.go
+
+          if (!(Test-Path "RaicilabsPOS.exe")) {
+            Write-Error "RaicilabsPOS.exe was not created."
+            exit 1
+          }
+
+          Write-Host "RaicilabsPOS.exe created successfully."
+
       - name: Create portable POS package
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path "Raicilabs POS/app" | Out-Null
 
           Copy-Item -Recurse -Force "dist/*" "Raicilabs POS/app/"
+
           Copy-Item -Force "server.exe" "Raicilabs POS/server.exe"
-          Copy-Item -Force "START POS.bat" "Raicilabs POS/START POS.bat"
+
+          Copy-Item -Force "RaicilabsPOS.exe" "Raicilabs POS/Raicilabs POS.exe"
 
           Write-Host ""
           Write-Host "Portable POS package:"

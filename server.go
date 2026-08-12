@@ -93,9 +93,6 @@ func main() {
 	log.Println("http://" + address)
 	log.Println("")
 	log.Println("Starting POS...")
-
-	go openPOS()
-
 	// IMPORTANT:
 	// Listen only on localhost.
 	// The POS is not exposed to the LAN or internet.
