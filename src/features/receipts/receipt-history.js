@@ -2,7 +2,7 @@
 
 import { h, clear, formatMoney, formatDate } from '../../core/ui.js';
 import { ReceiptsProvider } from '../../core/providers/receipts.js';
-import { navigate } from '../../core/router.js';
+import { showReceiptModal } from '../orders/order-items-modal.js';
 
 export function renderReceiptHistory(content) {
   clear(content);
@@ -27,7 +27,7 @@ export function renderReceiptHistory(content) {
     card.append(
       h('div', {
         class: 'list-item',
-        onclick: () => navigate(`/receipts/${r.id}`),
+        onclick: () => showReceiptModal(r),
       }, [
         h('div', { class: 'list-item__avatar' }, [r.receiptNumber.substring(0, 3)]),
         h('div', { class: 'list-item__main' }, [

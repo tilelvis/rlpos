@@ -5,11 +5,11 @@
 
 import { h, clear, formatMoney, formatDate, toast } from '../../core/ui.js';
 import { OrdersProvider } from '../../core/providers/orders.js';
-import { ReceiptsProvider } from '../../core/providers/receipts.js';
 import { CartProvider } from '../../core/providers/menu.js';
 import { AuthProvider } from '../../core/providers/auth.js';
 import { navigate } from '../../core/router.js';
 import { ORDER_STATUS } from '../../core/models/order.js';
+import { showOrderModal } from './order-items-modal.js';
 
 const STATUS_COLORS = {
   open: 'var(--accent)',
@@ -65,8 +65,10 @@ export function renderOrderHistory(content) {
             return;
           }
           if (o.status === 'completed') {
-            const receipt = ReceiptsProvider.findByOrderId(o.id);
-            if (receipt) navigate(`/receipts/${receipt.id}`);
+            // Just browsing history — show a read-only items popup,
+            // not the print-preview page (that's reserved for the
+            // live "complete sale" flow).
+            showOrderModal(o);
             return;
           }
           toast(`${o.orderNumber} · ${o.statusLabel}`, { type: 'info' });

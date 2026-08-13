@@ -19,7 +19,7 @@ import { ReportService } from '../../core/services/report_service.js';
 import { PrinterService } from '../../core/services/printer_service.js';
 import { FileDownloadService } from '../../core/services/file_download.js';
 import { store, CHANNELS } from '../../core/store.js';
-import { navigate } from '../../core/router.js';
+import { showReceiptModal } from '../orders/order-items-modal.js';
 
 let _subtab = 'sales'; // 'sales' | 'receipts'
 
@@ -302,10 +302,12 @@ function drawReceiptsTab(body) {
         'PDF',
       ]),
     ]);
-    // Tap anywhere on the row (except the PDF button) opens the receipt preview.
+    // Tap anywhere on the row (except the PDF button) shows a read-only
+    // items popup — not the print-preview page, which is reserved for
+    // the live "complete sale" flow.
     row.addEventListener('click', (e) => {
       if (e.target.closest('button')) return;
-      navigate(`/receipts/${r.id}`);
+      showReceiptModal(r);
     });
     card.append(row);
   }
