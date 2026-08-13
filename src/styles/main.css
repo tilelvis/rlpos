@@ -1120,8 +1120,8 @@ a:hover { text-decoration: underline; }
   top: 50%;
   right: 16px;
   transform: translateY(-50%);
-  width: 130px;
   height: 75%;
+  aspect-ratio: 9 / 16;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -1161,7 +1161,7 @@ a:hover { text-decoration: underline; }
   max-width: 100%;
 }
 @media (max-width: 480px) {
-  .carousel-badge { width: 96px; right: 10px; padding: 8px; }
+  .carousel-badge { height: 65%; right: 10px; padding: 8px; }
   .carousel-badge__label { font-size: 9px; }
 }
 

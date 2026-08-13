@@ -115,8 +115,12 @@ function renderCarousel(categories) {
   function paintBadge(cat) {
     const hex = '#' + (cat.colorValue & 0xffffff).toString(16).padStart(6, '0');
     if (cat.hasPhoto) {
-      badgeThumb.style.backgroundImage = `url(${cat.photoBase64})`;
+      // Clear the shorthand FIRST — `background` resets every longhand
+      // (image/position/size/color) at once, so setting it after
+      // backgroundImage wipes the image right back out. Longhand
+      // properties must be set after the shorthand reset, not before.
       badgeThumb.style.background = '';
+      badgeThumb.style.backgroundImage = `url(${cat.photoBase64})`;
       badgeThumb.style.backgroundSize = 'cover';
       badgeThumb.style.backgroundPosition = 'center';
     } else {
