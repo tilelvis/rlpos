@@ -82,7 +82,17 @@ html, body {
 body {
   display: flex;
   flex-direction: column;
+  /* 100vh is the *layout* viewport height, which on mobile browsers
+     includes the area the address bar covers — so the page renders
+     taller than what's actually visible, and anything pinned to the
+     bottom of that flex column (like .bottomnav) ends up below the
+     fold with no way to scroll to it (overflow is hidden on purpose,
+     see below). 100dvh is the *dynamic* viewport height — it tracks
+     the real visible area as the browser chrome shows/hides, so the
+     bottom nav stays reachable. Older browsers ignore the dvh line
+     and keep the vh fallback above it. */
   height: 100vh;
+  height: 100dvh;
   /* The app shell manages its own internal scroll regions (menu grid,
      cart list, tab panels, etc). Locking the page itself to the
      viewport height means those regions actually get a bounded box to
@@ -276,7 +286,8 @@ a:hover { text-decoration: underline; }
   align-items: stretch;
   background: var(--surface);
   border-top: 1px solid var(--divider);
-  height: var(--bottomnav-h);
+  height: calc(var(--bottomnav-h) + env(safe-area-inset-bottom, 0px));
+  padding-bottom: env(safe-area-inset-bottom, 0px);
   position: sticky;
   bottom: 0;
   z-index: 90;
@@ -1089,6 +1100,56 @@ a:hover { text-decoration: underline; }
   background: var(--primary);
 }
 
+/* Floating "current category" glass badge — pinned to the far right
+   edge of the carousel viewport, vertically centered. Frosted-glass
+   card look (blurred, translucent) so it reads as an overlay accent
+   rather than competing with the slide's own overlay text. */
+.carousel-badge {
+  position: absolute;
+  top: 50%;
+  right: 16px;
+  transform: translateY(-50%);
+  width: 84px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 8px;
+  border-radius: var(--radius-lg);
+  background: rgba(255,255,255,0.16);
+  border: 1px solid rgba(255,255,255,0.35);
+  backdrop-filter: blur(14px) saturate(160%);
+  -webkit-backdrop-filter: blur(14px) saturate(160%);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.18);
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+.carousel-badge:hover { transform: translateY(-50%) scale(1.04); }
+.carousel-badge__thumb {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: var(--radius-md);
+  background-color: rgba(255,255,255,0.25);
+  border: 1px solid rgba(255,255,255,0.4);
+}
+.carousel-badge__label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: #fff;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.5);
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+@media (max-width: 480px) {
+  .carousel-badge { width: 64px; right: 10px; padding: 6px; }
+  .carousel-badge__label { font-size: 9px; }
+}
+
 /* --- Quick add row --- */
 .quick-add-section {
   padding: 16px 16px 0;
@@ -1321,36 +1382,47 @@ a:hover { text-decoration: underline; }
 .unpaid-notif-chip:hover { background: var(--primary-dark); }
 .unpaid-notif-chip:active { transform: scale(0.97); }
 
-/* --- Dashboard summary bar (replaces KPI cards at top) --- */
+/* --- Dashboard summary bar (replaces KPI cards at top) ---
+   Capped to the carousel's max-width and centered so it reads as one
+   cohesive card that fills the window on desktop, instead of a thin
+   full-bleed strip with everything bunched on the left and empty
+   space trailing off to the right. */
 .dashboard-summary {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 16px;
-  background: var(--surface);
-  border-bottom: 1px solid var(--divider);
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+  width: 100%;
+  max-width: 1100px;
+  margin: 12px auto 0;
+  padding: 0 16px;
+  box-sizing: border-box;
 }
 .dashboard-summary__stat {
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: 2px;
+  padding: 14px 8px;
+  background: var(--surface);
+  border: 1px solid var(--divider);
+  border-right: none;
 }
+.dashboard-summary__stat:first-child { border-radius: var(--radius-lg) 0 0 var(--radius-lg); }
+.dashboard-summary__stat:last-child { border-radius: 0 var(--radius-lg) var(--radius-lg) 0; border-right: 1px solid var(--divider); }
 .dashboard-summary__stat-label {
   font-size: 11px;
   color: var(--muted);
   font-weight: 700;
   letter-spacing: 0.6px;
+  text-align: center;
 }
 .dashboard-summary__stat-value {
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 800;
   color: var(--ink);
 }
-.dashboard-summary__divider {
-  width: 1px;
-  height: 28px;
-  background: var(--divider);
+@media (max-width: 560px) {
+  .dashboard-summary { grid-template-columns: repeat(2, 1fr); gap: 8px; padding: 0 12px; }
+  .dashboard-summary__stat { border-right: 1px solid var(--divider); border-radius: var(--radius-md) !important; }
 }
 
 /* --- Reports sub-tabs (Sales / Receipts) --- */

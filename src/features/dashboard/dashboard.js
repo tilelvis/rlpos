@@ -44,20 +44,18 @@ export function renderDashboard(content) {
   }
 
   // -------- 2. Summary bar --------
-  const summary = h('div', { class: 'dashboard-summary' }, []);
-  summary.append(
-    summaryStat('CATEGORIES', String(cats.length)),
-    h('div', { class: 'dashboard-summary__divider' }, []),
-    summaryStat('ITEMS', String(allItems.length)),
-    h('div', { class: 'dashboard-summary__divider' }, []),
-    summaryStat('ORDERS TODAY', String(ordersToday)),
-  );
-  if (canSeeFinancials) {
-    summary.append(
-      h('div', { class: 'dashboard-summary__divider' }, []),
-      summaryStat('SALES TODAY', formatMoney0(salesToday)),
-    );
-  }
+  // Capped to the same width as the carousel and laid out as equal
+  // columns so it doesn't trail off into empty space on wide/PC
+  // windows — previously it hugged the left edge with everything
+  // sized to content, leaving a big gap on the right.
+  const stats = [
+    ['CATEGORIES', String(cats.length)],
+    ['ITEMS', String(allItems.length)],
+    ['ORDERS TODAY', String(ordersToday)],
+  ];
+  if (canSeeFinancials) stats.push(['SALES TODAY', formatMoney0(salesToday)]);
+
+  const summary = h('div', { class: 'dashboard-summary' }, stats.map(([label, value]) => summaryStat(label, value)));
   root.append(summary);
 
   content.append(root);
@@ -101,6 +99,33 @@ function renderCarousel(categories) {
   const carousel = h('div', { class: 'carousel' }, []);
   const viewport = h('div', { class: 'carousel__viewport' }, []);
   const dots = h('div', { class: 'carousel__dots' }, []);
+
+  // Floating glass "current category" badge — sits at the far right of
+  // the carousel viewport and mirrors whichever slide is active.
+  const badgeThumb = h('div', { class: 'carousel-badge__thumb' }, []);
+  const badgeLabel = h('div', { class: 'carousel-badge__label' }, []);
+  const badge = h('div', {
+    class: 'carousel-badge',
+    onclick: (e) => {
+      e.stopPropagation();
+      navigate(`/orders/new?cat=${slides[_current].id}`);
+    },
+  }, [badgeThumb, badgeLabel]);
+
+  function paintBadge(cat) {
+    const hex = '#' + (cat.colorValue & 0xffffff).toString(16).padStart(6, '0');
+    if (cat.hasPhoto) {
+      badgeThumb.style.backgroundImage = `url(${cat.photoBase64})`;
+      badgeThumb.style.background = '';
+      badgeThumb.style.backgroundSize = 'cover';
+      badgeThumb.style.backgroundPosition = 'center';
+    } else {
+      badgeThumb.style.backgroundImage = '';
+      badgeThumb.style.background = `linear-gradient(135deg, ${hex}, ${hex}99)`;
+    }
+    clear(badgeLabel);
+    badgeLabel.append(cat.name);
+  }
 
   function buildSlide(cat, i) {
     const items = MenuProvider.items.filter((m) => m.categoryId === cat.id);
@@ -152,7 +177,9 @@ function renderCarousel(categories) {
   }
 
   carousel.appendChild(viewport);
+  viewport.appendChild(badge);
   carousel.appendChild(dots);
+  paintBadge(slides[0]);
 
   function goTo(idx, userTriggered = false) {
     if (idx === _current) return;
@@ -163,6 +190,7 @@ function renderCarousel(categories) {
     dots.querySelectorAll('.carousel__dot').forEach((d) => {
       d.classList.toggle('active', Number(d.dataset.index) === _current);
     });
+    paintBadge(slides[_current]);
     if (userTriggered) restartTimer();
   }
 
