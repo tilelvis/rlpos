@@ -147,7 +147,7 @@ function openUnpaidOrdersModal() {
  * Receipts are NOT printed here — printing already happened at the
  * Complete Sale step. This modal only records HOW the order was paid.
  */
-function openConfirmPaymentModal(order, user, onConfirmed) {
+export function openConfirmPaymentModal(order, user, onConfirmed) {
   let _paymentType = 'cash'; // 'cash' | 'mpesa'
 
   const body = h('div', {}, []);

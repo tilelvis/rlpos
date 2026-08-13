@@ -9,6 +9,8 @@
 // read-only modal instead: no navigation, no printer, no auto-logout.
 
 import { h, showModal, formatMoney, formatDate } from '../../core/ui.js';
+import { AuthProvider } from '../../core/providers/auth.js';
+import { openConfirmPaymentModal } from './unpaid-notif.js';
 
 /**
  * @param {object} opts
@@ -17,8 +19,9 @@ import { h, showModal, formatMoney, formatDate } from '../../core/ui.js';
  * @param {Array}  opts.items        [{ name, quantity, unitPrice, lineTotal? }]
  * @param {number} opts.total
  * @param {Array}  [opts.badges]     Extra small tag elements (status, paid/unpaid…).
+ * @param {Array}  [opts.extraActions] Extra buttons, placed before Close.
  */
-export function showOrderItemsModal({ heading, subtitle, items, total, badges = [] }) {
+export function showOrderItemsModal({ heading, subtitle, items, total, badges = [], extraActions = [] }) {
   const rows = items.map((it) => {
     const lineTotal = it.lineTotal ?? it.unitPrice * it.quantity;
     return h('div', { class: 'order-items-modal__row' }, [
@@ -49,10 +52,13 @@ export function showOrderItemsModal({ heading, subtitle, items, total, badges = 
     title: heading,
     content: body,
     size: 'sm',
-    actions: [
-      h('button', { class: 'btn btn--text', onclick: () => dlg.close() }, ['Close']),
-    ],
+    actions: [],
   });
+
+  dlg.root.querySelector('.modal__actions').append(
+    ...extraActions.map((make) => make(dlg)),
+    h('button', { class: 'btn btn--text', onclick: () => dlg.close() }, ['Close']),
+  );
 
   return dlg;
 }
@@ -67,12 +73,35 @@ export function showOrderModal(order) {
   } else {
     badges.push(h('span', { class: 'tag' }, [order.statusLabel]));
   }
+
+  const user = AuthProvider.currentUser;
+  const extraActions = [];
+  // Only admin/cashier can mark an order paid — same permission the
+  // floating unpaid-orders chip already requires.
+  if (order.isUnpaid && user?.canViewFinancials) {
+    extraActions.push((dlg) =>
+      h('button', {
+        class: 'btn btn--filled',
+        onclick: () => {
+          dlg.close();
+          // Small defer so the items-modal's close animation can start
+          // before the payment modal (and any resulting re-render) fires.
+          setTimeout(() => openConfirmPaymentModal(order, user, null), 300);
+        },
+      }, [
+        h('span', { class: 'icon material-symbols-outlined', style: { fontSize: '16px' } }, ['payments']),
+        'Confirm payment',
+      ]),
+    );
+  }
+
   return showOrderItemsModal({
     heading: order.orderNumber,
     subtitle: `${formatDate(order.createdAt)} · Taken by ${order.cashierName}`,
     items: order.items,
     total: order.total,
     badges,
+    extraActions,
   });
 }
 
