@@ -12,9 +12,10 @@
 // itself is admin/cashier-only in the bottom nav, so this is enforced
 // at the route level).
 
-import { h, clear, formatMoney0, formatMoney, toast, formatDate } from '../../core/ui.js';
+import { h, clear, formatMoney0, formatMoney, toast, formatDate, showModal } from '../../core/ui.js';
 import { OrdersProvider } from '../../core/providers/orders.js';
 import { ReceiptsProvider } from '../../core/providers/receipts.js';
+import { AuthProvider } from '../../core/providers/auth.js';
 import { ReportService } from '../../core/services/report_service.js';
 import { PrinterService } from '../../core/services/printer_service.js';
 import { FileDownloadService } from '../../core/services/file_download.js';
@@ -158,6 +159,26 @@ function drawSalesTab(body) {
     ]),
   );
 
+  // ---- Restore from backup (admin only — writes/overwrites business data) ----
+  if (AuthProvider.currentUser?.isAdmin) {
+    body.append(
+      h('div', { style: { height: '20px' } }, []),
+      h('div', { class: 'card' }, [
+        h('h2', { class: 'section-title', style: { margin: '0 0 4px' } }, ['Restore from Backup']),
+        h('p', { style: { color: 'var(--muted)', fontSize: '12px', marginTop: '0' } }, [
+          "Lost your sales history — new device, reinstall, cleared browser data? Every report downloaded above doubles as a backup. Upload one here to restore it; records already on this device are left untouched.",
+        ]),
+        h('button', {
+          class: 'btn btn--outlined',
+          onclick: () => restoreFromBackup(),
+        }, [
+          h('span', { class: 'icon material-symbols-outlined', style: { fontSize: '18px' } }, ['upload_file']),
+          'Upload Report to Restore',
+        ]),
+      ]),
+    );
+  }
+
   // ---- Summary ----
   body.append(
     h('div', { style: { height: '20px' } }, []),
@@ -243,6 +264,74 @@ function drawSalesTab(body) {
     }
     body.append(card);
   }
+}
+
+// ------------------ Restore from backup ------------------
+
+function pickBackupFile() {
+  return new Promise((resolve) => {
+    const input = h('input', { type: 'file', accept: '.xlsx' });
+    input.style.position = 'fixed';
+    input.style.opacity = '0';
+    document.body.appendChild(input);
+    input.addEventListener('change', () => {
+      const file = input.files?.[0];
+      input.remove();
+      resolve(file ?? null);
+    });
+    input.click();
+  });
+}
+
+async function restoreFromBackup() {
+  const file = await pickBackupFile();
+  if (!file) return;
+
+  let backup;
+  try {
+    const buf = await file.arrayBuffer();
+    backup = await ReportService.readBackupFile(new Uint8Array(buf));
+  } catch (e) {
+    toast(e.message || 'Restore failed.', { type: 'error' });
+    return;
+  }
+  if (backup.orders.length === 0) {
+    toast('That report has no orders to restore.', { type: 'warning' });
+    return;
+  }
+
+  const rangeLabel = backup.rangeStart
+    ? `${formatDate(backup.rangeStart, 'dd/MM/yyyy')} \u2013 ${formatDate(backup.rangeEnd, 'dd/MM/yyyy')}`
+    : 'an unknown range';
+
+  const dlg = showModal({
+    title: 'Restore from backup?',
+    content: h('div', {}, [
+      h('p', {}, [
+        `This report covers ${rangeLabel} and contains ${backup.orders.length} order(s) and ${backup.receipts.length} receipt(s).`,
+      ]),
+      h('p', { style: { color: 'var(--muted)', fontSize: '12px' } }, [
+        "Records already on this device are matched by ID and left untouched — only what's missing gets added back.",
+      ]),
+    ]),
+    size: 'sm',
+    actions: [],
+  });
+  dlg.root.querySelector('.modal__actions').append(
+    h('button', { class: 'btn btn--text', onclick: () => dlg.close() }, ['Cancel']),
+    h('button', {
+      class: 'btn btn--filled',
+      onclick: async () => {
+        const result = await OrdersProvider.importBackup(backup);
+        toast(
+          `Restored ${result.ordersAdded} order(s) and ${result.receiptsAdded} receipt(s).` +
+            (result.ordersSkipped ? ` ${result.ordersSkipped} already existed and were skipped.` : ''),
+          { type: 'success' },
+        );
+        dlg.close();
+      },
+    }, ['Restore']),
+  );
 }
 
 // ------------------ Receipts sub-tab ------------------

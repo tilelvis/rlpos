@@ -146,4 +146,30 @@ export const OrdersProvider = {
     store.bump(CHANNELS.orders);
     return updated;
   },
+
+  /** Restore orders + receipts from a previously downloaded report's
+   *  embedded backup data (see ReportService.readBackupFile). Matches
+   *  by id — records already present are left untouched, so importing
+   *  the same file twice (or files with overlapping date ranges) is
+   *  always safe and never overwrites live data.
+   *
+   *  @param {{orders?: object[], receipts?: object[]}} backup
+   */
+  async importBackup({ orders = [], receipts = [] }) {
+    let ordersAdded = 0, ordersSkipped = 0;
+    for (const m of orders) {
+      if (StorageService.findOrder(m.id)) { ordersSkipped++; continue; }
+      await StorageService.upsertOrder(Order.fromMap(m));
+      ordersAdded++;
+    }
+    let receiptsAdded = 0, receiptsSkipped = 0;
+    for (const m of receipts) {
+      if (StorageService.findReceipt(m.id)) { receiptsSkipped++; continue; }
+      await StorageService.upsertReceipt(Receipt.fromMap(m));
+      receiptsAdded++;
+    }
+    store.bump(CHANNELS.orders);
+    store.bump(CHANNELS.receipts);
+    return { ordersAdded, ordersSkipped, receiptsAdded, receiptsSkipped };
+  },
 };
