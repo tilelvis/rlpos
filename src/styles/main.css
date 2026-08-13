@@ -1007,18 +1007,27 @@ a:hover { text-decoration: underline; }
   margin: 0 auto;
   padding: 16px 16px 0;
   box-sizing: border-box;
+  /* Grow to fill whatever vertical space is actually available
+     between the app bar and the summary bar/bottom nav, instead of a
+     fixed aspect-ratio that leaves a dead gap on tall/PC screens. */
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 .carousel__viewport {
   position: relative;
   width: 100%;
-  aspect-ratio: 16 / 7;
+  flex: 1;
+  min-height: 200px;
+  max-height: 640px;
   border-radius: var(--radius-xl);
   overflow: hidden;
   box-shadow: var(--shadow-card);
   cursor: pointer;
 }
 @media (max-width: 720px) {
-  .carousel__viewport { aspect-ratio: 16 / 9; }
+  .carousel__viewport { min-height: 180px; max-height: 420px; }
 }
 .carousel__slide {
   position: absolute;
@@ -1083,6 +1092,7 @@ a:hover { text-decoration: underline; }
   justify-content: center;
   gap: 6px;
   margin-top: 12px;
+  flex: 0 0 auto;
 }
 .carousel__dot {
   width: 8px;
@@ -1101,20 +1111,21 @@ a:hover { text-decoration: underline; }
 }
 
 /* Floating "current category" glass badge — pinned to the far right
-   edge of the carousel viewport, vertically centered. Frosted-glass
-   card look (blurred, translucent) so it reads as an overlay accent
-   rather than competing with the slide's own overlay text. */
+   edge of the carousel viewport, vertically centered, sized to 3/4 of
+   the viewport's height so it reads as a real card rather than a tiny
+   chip. Frosted-glass look (blurred, translucent) so it sits as an
+   overlay accent rather than competing with the slide's own text. */
 .carousel-badge {
   position: absolute;
   top: 50%;
   right: 16px;
   transform: translateY(-50%);
-  width: 84px;
+  width: 130px;
+  height: 75%;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  padding: 8px;
+  gap: 8px;
+  padding: 10px;
   border-radius: var(--radius-lg);
   background: rgba(255,255,255,0.16);
   border: 1px solid rgba(255,255,255,0.35);
@@ -1124,16 +1135,20 @@ a:hover { text-decoration: underline; }
   cursor: pointer;
   transition: transform 0.2s ease;
 }
-.carousel-badge:hover { transform: translateY(-50%) scale(1.04); }
+.carousel-badge:hover { transform: translateY(-50%) scale(1.03); }
 .carousel-badge__thumb {
+  flex: 1;
+  min-height: 0;
   width: 100%;
-  aspect-ratio: 1;
   border-radius: var(--radius-md);
   background-color: rgba(255,255,255,0.25);
   border: 1px solid rgba(255,255,255,0.4);
+  background-size: cover;
+  background-position: center;
 }
 .carousel-badge__label {
-  font-size: 10px;
+  flex: 0 0 auto;
+  font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.4px;
@@ -1146,7 +1161,7 @@ a:hover { text-decoration: underline; }
   max-width: 100%;
 }
 @media (max-width: 480px) {
-  .carousel-badge { width: 64px; right: 10px; padding: 6px; }
+  .carousel-badge { width: 96px; right: 10px; padding: 8px; }
   .carousel-badge__label { font-size: 9px; }
 }
 
