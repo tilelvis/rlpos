@@ -56,8 +56,8 @@ export default defineConfig({
         scope: '/',
         id: 'raicilabs-pos',
         display: 'standalone',
-        background_color: '#F7F4EE',
-        theme_color: '#C0392B',
+        background_color: '#F5F4F0',
+        theme_color: '#33475A',
         orientation: 'any',
         categories: ['business', 'productivity'],
         icons: [

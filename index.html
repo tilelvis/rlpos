@@ -19,7 +19,7 @@
   <title>Raicilabs POS</title>
 
   <!-- PWA theme color -->
-  <meta name="theme-color" content="#C0392B" />
+  <meta name="theme-color" content="#33475A" />
 
   <!-- Fonts are self-hosted (see src/main.js -> @fontsource/inter) and
        bundled into the build output — no Google Fonts CDN request is
@@ -30,14 +30,14 @@
   <style>
     /* Loading screen — shown until the JS bundle boots the auth gate.
        Mirrors the Flutter app's loading screen visually. */
-    html, body { margin: 0; padding: 0; background: #F7F4EE; height: 100%; }
+    html, body { margin: 0; padding: 0; background: #F5F4F0; height: 100%; }
     #loading {
       position: fixed; inset: 0;
       display: flex; flex-direction: column;
       align-items: center; justify-content: center;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      color: #1F1B16;
-      background: #F7F4EE;
+      color: #24231F;
+      background: #F5F4F0;
       transition: opacity 0.4s ease;
       z-index: 9999;
     }
@@ -52,12 +52,12 @@
       object-fit: contain;
     }
     #loading h1 { font-size: 18px; margin: 0 0 4px 0; font-weight: 700; }
-    #loading p { font-size: 12px; margin: 0; color: #6B6357; }
+    #loading p { font-size: 12px; margin: 0; color: #79766D; }
     #loading .spinner {
       margin-top: 18px;
       width: 24px; height: 24px;
-      border: 2px solid #E2DBCE;
-      border-top-color: #C0392B;
+      border: 2px solid #E3E0D8;
+      border-top-color: #33475A;
       border-radius: 50%;
       animation: spin 0.8s linear infinite;
     }

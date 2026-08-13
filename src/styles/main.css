@@ -1,28 +1,31 @@
 /* Raicilabs POS — main stylesheet.
-   Warm earthy Nairobi palette (brick-red primary, amber accent, cream bg).
-   Mirrors the Flutter app's Material 3 theme. */
+   Nordic minimalist: muted slate primary, warm paper background, flat
+   surfaces with thin borders — restraint over decoration. No gradients,
+   no glow shadows. */
 
 * { box-sizing: border-box; }
 :root {
-  --primary: #C0392B;
-  --primary-dark: #8E2A1F;
-  --accent: #F39C12;
-  --bg: #F7F4EE;
+  --primary: #33475A;
+  --primary-dark: #24333F;
+  --primary-rgb: 51, 71, 90;
+  --accent: #B0745A;
+  --accent-rgb: 176, 116, 90;
+  --bg: #F5F4F0;
   --surface: #FFFFFF;
-  --ink: #1F1B16;
-  --muted: #6B6357;
-  --success: #27AE60;
-  --danger: #C0392B;
-  --divider: #E2DBCE;
-  --warning: #8E44AD;
-  --radius-sm: 8px;
-  --radius-md: 10px;
-  --radius-lg: 14px;
-  --radius-xl: 20px;
-  --shadow-card: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
-  --shadow-hover: 0 4px 14px rgba(0,0,0,0.08), 0 2px 6px rgba(0,0,0,0.04);
-  --shadow-floating: 0 8px 28px rgba(0,0,0,0.12), 0 4px 10px rgba(0,0,0,0.06);
-  --shadow-receipt: 0 4px 16px rgba(0,0,0,0.08);
+  --ink: #24231F;
+  --muted: #79766D;
+  --success: #5C7A5C;
+  --danger: #A8503B;
+  --divider: #E3E0D8;
+  --warning: #B8903E;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+  --shadow-card: 0 1px 2px rgba(36,35,31,0.04);
+  --shadow-hover: 0 2px 6px rgba(36,35,31,0.06);
+  --shadow-floating: 0 8px 24px rgba(36,35,31,0.10);
+  --shadow-receipt: 0 2px 8px rgba(36,35,31,0.06);
   --font-sans: 'JetBrains Mono', 'SFMono-Regular', Consolas, Menlo, monospace;
   --font-mono: "Courier New", "Liberation Mono", "DejaVu Sans Mono", monospace;
   --header-h: 56px;
@@ -96,19 +99,23 @@ a:hover { text-decoration: underline; }
   white-space: nowrap;
   user-select: none;
 }
-.btn:hover { background: #f5f1ea; }
+.btn:hover { background: #EFEDE6; }
 .btn:active { transform: scale(0.98); }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
-.btn--filled { background: var(--primary); color: #fff; border-color: var(--primary); }
+.btn--filled {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+}
 .btn--filled:hover { background: var(--primary-dark); }
 .btn--outlined { background: var(--surface); border-color: var(--divider); color: var(--ink); }
-.btn--outlined:hover { background: #faf7f1; }
+.btn--outlined:hover { background: #EFEDE6; }
 .btn--text { background: transparent; border-color: transparent; padding: 8px 12px; color: var(--primary); }
-.btn--text:hover { background: rgba(192, 57, 43, 0.06); }
+.btn--text:hover { background: rgba(var(--primary-rgb), 0.06); }
 .btn--danger { background: var(--danger); color: #fff; border-color: var(--danger); }
 .btn--danger:hover { background: var(--primary-dark); }
-.btn--tonal { background: rgba(192, 57, 43, 0.10); color: var(--primary); border-color: transparent; }
-.btn--tonal:hover { background: rgba(192, 57, 43, 0.18); }
+.btn--tonal { background: rgba(var(--primary-rgb), 0.10); color: var(--primary); border-color: transparent; }
+.btn--tonal:hover { background: rgba(var(--primary-rgb), 0.18); }
 .btn--block { display: flex; width: 100%; min-height: 48px; }
 .btn--lg { font-size: 16px; padding: 14px 24px; }
 .btn--sm { font-size: 12px; padding: 6px 10px; min-height: 28px; }
@@ -140,7 +147,7 @@ a:hover { text-decoration: underline; }
 }
 .input:focus, .select:focus, .textarea:focus {
   border-color: var(--primary);
-  box-shadow: 0 0 0 2px rgba(192, 57, 43, 0.18);
+  box-shadow: 0 0 0 2px rgba(var(--primary-rgb), 0.18);
 }
 .input::placeholder, .textarea::placeholder { color: #aaa; }
 .textarea { min-height: 72px; resize: vertical; }
@@ -296,7 +303,7 @@ a:hover { text-decoration: underline; }
 .toast--visible { opacity: 1; transform: translateY(0); }
 .toast--success { background: var(--success); }
 .toast--error { background: var(--danger); }
-.toast--warning { background: var(--accent); }
+.toast--warning { background: var(--warning); }
 .toast__msg { flex: 1; }
 .toast__close {
   background: transparent;
@@ -368,12 +375,12 @@ a:hover { text-decoration: underline; }
   cursor: pointer;
   transition: background 0.1s;
 }
-.list-item:hover { background: rgba(192, 57, 43, 0.04); }
+.list-item:hover { background: rgba(var(--primary-rgb), 0.04); }
 .list-item:last-child { border-bottom: 0; }
 .list-item__avatar {
   width: 40px; height: 40px;
   border-radius: 50%;
-  background: rgba(192, 57, 43, 0.10);
+  background: rgba(var(--primary-rgb), 0.10);
   color: var(--primary);
   display: flex;
   align-items: center;
@@ -410,13 +417,13 @@ a:hover { text-decoration: underline; }
   font-weight: 700;
   letter-spacing: 0.4px;
   text-transform: uppercase;
-  background: rgba(192, 57, 43, 0.10);
+  background: rgba(var(--primary-rgb), 0.10);
   color: var(--primary);
 }
-.tag--success { background: rgba(39, 174, 96, 0.12); color: var(--success); }
-.tag--warning { background: rgba(243, 156, 18, 0.15); color: var(--accent); }
-.tag--muted { background: rgba(107, 99, 87, 0.10); color: var(--muted); }
-.tag--purple { background: rgba(142, 68, 173, 0.10); color: var(--warning); }
+.tag--success { background: rgba(92, 122, 92, 0.12); color: var(--success); }
+.tag--warning { background: rgba(184, 144, 62, 0.15); color: var(--warning); }
+.tag--muted { background: rgba(110, 101, 128, 0.10); color: var(--muted); }
+.tag--purple { background: rgba(var(--primary-rgb), 0.10); color: var(--primary); }
 
 /* --- Filter chip --- */
 .chip {
@@ -433,7 +440,7 @@ a:hover { text-decoration: underline; }
   cursor: pointer;
   white-space: nowrap;
 }
-.chip:hover { background: #faf7f1; }
+.chip:hover { background: #EFEDE6; }
 .chip.active {
   background: var(--primary);
   color: #fff;
@@ -783,8 +790,8 @@ a:hover { text-decoration: underline; }
   padding: 8px 16px;
   font-size: 12px;
 }
-.status-bar--ok { background: rgba(39, 174, 96, 0.10); color: var(--success); }
-.status-bar--info { background: rgba(192, 57, 43, 0.08); color: var(--primary); }
+.status-bar--ok { background: rgba(92, 122, 92, 0.10); color: var(--success); }
+.status-bar--info { background: rgba(var(--primary-rgb), 0.08); color: var(--primary); }
 .status-bar--muted { background: var(--bg); color: var(--muted); }
 .status-bar__text { flex: 1; font-weight: 600; }
 
@@ -1055,7 +1062,7 @@ a:hover { text-decoration: underline; }
 }
 .quick-add-chip:hover {
   border-color: var(--primary);
-  background: rgba(192, 57, 43, 0.04);
+  background: rgba(var(--primary-rgb), 0.04);
 }
 .quick-add-chip:active { transform: scale(0.97); }
 .quick-add-chip__price {
@@ -1304,10 +1311,10 @@ a:hover { text-decoration: underline; }
 
 /* --- Paid / Unpaid badges in order lists --- */
 .tag--unpaid {
-  background: rgba(192, 57, 43, 0.10);
+  background: rgba(var(--primary-rgb), 0.10);
   color: var(--danger);
 }
 .tag--paid {
-  background: rgba(39, 174, 96, 0.12);
+  background: rgba(92, 122, 92, 0.12);
   color: var(--success);
 }

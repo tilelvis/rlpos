@@ -61,9 +61,9 @@ main().catch((e) => {
   const loading = document.getElementById('loading');
   if (loading) {
     loading.innerHTML = `
-      <h1 style="color:#C0392B">Failed to start</h1>
+      <h1 style="color:#A8503B">Failed to start</h1>
       <p style="max-width: 320px; text-align: center;">${String(e?.message || e).replace(/</g, '&lt;')}</p>
-      <p style="font-size:12px; color:#6B6357;">Open the browser console for details.</p>
+      <p style="font-size:12px; color:#79766D;">Open the browser console for details.</p>
     `;
   }
 });
