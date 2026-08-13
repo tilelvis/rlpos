@@ -239,6 +239,15 @@ export const StorageService = {
     }
   },
 
+  // ----- Theme preference ('light' | 'dark') -----
+  get themePreference() {
+    return readScalar(STORAGE_KEYS.theme, 'light');
+  },
+
+  set themePreference(mode) {
+    writeScalar(STORAGE_KEYS.theme, mode === 'dark' ? 'dark' : 'light');
+  },
+
   // ----- Bulk reset -----
 
   /** Clears only open/held orders — stuck carts. Keeps completed orders,

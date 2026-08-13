@@ -41,6 +41,7 @@ export const STORAGE_KEYS = {
   counters: 'raicilabs.counters',
   reportFlags: 'raicilabs.reportFlags',
   session: 'raicilabs.session', // currently-logged-in user id
+  theme: 'raicilabs.theme', // 'light' | 'dark'
 };
 
 // WebUSB vendor IDs recognised as ESC/POS thermal printers.

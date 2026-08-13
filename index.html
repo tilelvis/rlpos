@@ -27,6 +27,22 @@
        Icons are inline SVG (src/core/icons.js), not a web font, so no
        icon font is loaded at all. -->
 
+  <!-- Applied synchronously, before first paint, so a dark-mode user
+       never sees a flash of the light theme while the JS module
+       loads. ThemeService (core/services/theme_service.js) re-applies
+       this on boot and owns all writes after this point. -->
+  <script>
+    (function () {
+      try {
+        var raw = localStorage.getItem('raicilabs.theme');
+        var mode = raw ? JSON.parse(raw) : 'light';
+        document.documentElement.setAttribute('data-theme', mode === 'dark' ? 'dark' : 'light');
+      } catch (e) {
+        document.documentElement.setAttribute('data-theme', 'light');
+      }
+    })();
+  </script>
+
   <style>
     /* Loading screen — shown until the JS bundle boots the auth gate.
        Mirrors the Flutter app's loading screen visually. */
@@ -62,6 +78,11 @@
       animation: spin 0.8s linear infinite;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
+
+    html[data-theme="dark"], html[data-theme="dark"] body { background: #1B1A17; }
+    html[data-theme="dark"] #loading { background: #1B1A17; color: #E8E6DE; }
+    html[data-theme="dark"] #loading p { color: #948F82; }
+    html[data-theme="dark"] #loading .spinner { border-color: #37352F; border-top-color: #7A94A8; }
   </style>
 </head>
 <body>

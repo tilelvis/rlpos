@@ -10,6 +10,9 @@
   --primary-rgb: 51, 71, 90;
   --accent: #B0745A;
   --accent-rgb: 176, 116, 90;
+  --success-rgb: 92, 122, 92;
+  --warning-rgb: 184, 144, 62;
+  --muted-rgb: 121, 118, 109;
   --bg: #F5F4F0;
   --surface: #FFFFFF;
   --ink: #24231F;
@@ -26,10 +29,41 @@
   --shadow-hover: 0 2px 6px rgba(36,35,31,0.06);
   --shadow-floating: 0 8px 24px rgba(36,35,31,0.10);
   --shadow-receipt: 0 2px 8px rgba(36,35,31,0.06);
+  --overlay-strong: #24231F;
+  --hover-tint: #EFEDE6;
   --font-sans: 'JetBrains Mono', 'SFMono-Regular', Consolas, Menlo, monospace;
   --font-mono: "Courier New", "Liberation Mono", "DejaVu Sans Mono", monospace;
   --header-h: 56px;
   --bottomnav-h: 64px;
+}
+
+/* Dark theme — same Nordic restraint: muted hues, flat surfaces, thin
+   borders. No new decorative rules, just a re-pointed palette. Toggled
+   via ThemeService (core/services/theme_service.js), which sets
+   data-theme on <html> and persists the choice. */
+html[data-theme="dark"] {
+  --primary: #7A94A8;
+  --primary-dark: #8FA8BA;
+  --primary-rgb: 122, 148, 168;
+  --accent: #C48868;
+  --accent-rgb: 196, 136, 104;
+  --success-rgb: 127, 160, 127;
+  --warning-rgb: 209, 168, 85;
+  --muted-rgb: 148, 143, 130;
+  --bg: #1B1A17;
+  --surface: #242219;
+  --ink: #E8E6DE;
+  --muted: #948F82;
+  --success: #7FA07F;
+  --danger: #C2795D;
+  --divider: #37352F;
+  --warning: #D1A855;
+  --shadow-card: 0 1px 2px rgba(0,0,0,0.24);
+  --shadow-hover: 0 2px 6px rgba(0,0,0,0.32);
+  --shadow-floating: 0 8px 24px rgba(0,0,0,0.45);
+  --shadow-receipt: 0 4px 16px rgba(0,0,0,0.4);
+  --overlay-strong: #0F0E0C;
+  --hover-tint: #2E2C24;
 }
 
 html, body {
@@ -99,7 +133,7 @@ a:hover { text-decoration: underline; }
   white-space: nowrap;
   user-select: none;
 }
-.btn:hover { background: #EFEDE6; }
+.btn:hover { background: var(--hover-tint); }
 .btn:active { transform: scale(0.98); }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
 .btn--filled {
@@ -109,7 +143,7 @@ a:hover { text-decoration: underline; }
 }
 .btn--filled:hover { background: var(--primary-dark); }
 .btn--outlined { background: var(--surface); border-color: var(--divider); color: var(--ink); }
-.btn--outlined:hover { background: #EFEDE6; }
+.btn--outlined:hover { background: var(--hover-tint); }
 .btn--text { background: transparent; border-color: transparent; padding: 8px 12px; color: var(--primary); }
 .btn--text:hover { background: rgba(var(--primary-rgb), 0.06); }
 .btn--danger { background: var(--danger); color: #fff; border-color: var(--danger); }
@@ -287,7 +321,7 @@ a:hover { text-decoration: underline; }
   display: flex;
   align-items: center;
   gap: 12px;
-  background: var(--ink);
+  background: var(--overlay-strong);
   color: #fff;
   padding: 12px 14px;
   border-radius: var(--radius-md);
@@ -320,7 +354,7 @@ a:hover { text-decoration: underline; }
 .modal {
   position: fixed;
   inset: 0;
-  background: rgba(31, 27, 22, 0.45);
+  background: rgba(15, 14, 12, 0.55);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -420,9 +454,9 @@ a:hover { text-decoration: underline; }
   background: rgba(var(--primary-rgb), 0.10);
   color: var(--primary);
 }
-.tag--success { background: rgba(92, 122, 92, 0.12); color: var(--success); }
-.tag--warning { background: rgba(184, 144, 62, 0.15); color: var(--warning); }
-.tag--muted { background: rgba(110, 101, 128, 0.10); color: var(--muted); }
+.tag--success { background: rgba(var(--success-rgb), 0.12); color: var(--success); }
+.tag--warning { background: rgba(var(--warning-rgb), 0.15); color: var(--warning); }
+.tag--muted { background: rgba(var(--muted-rgb), 0.10); color: var(--muted); }
 .tag--purple { background: rgba(var(--primary-rgb), 0.10); color: var(--primary); }
 
 /* --- Filter chip --- */
@@ -440,7 +474,7 @@ a:hover { text-decoration: underline; }
   cursor: pointer;
   white-space: nowrap;
 }
-.chip:hover { background: #EFEDE6; }
+.chip:hover { background: var(--hover-tint); }
 .chip.active {
   background: var(--primary);
   color: #fff;
@@ -523,7 +557,7 @@ a:hover { text-decoration: underline; }
   animation: spin 0.8s linear infinite;
 }
 .spinner--dark {
-  border: 2px solid rgba(31, 27, 22, 0.18);
+  border: 2px solid var(--divider);
   border-top-color: var(--primary);
 }
 @keyframes spin { to { transform: rotate(360deg); } }
@@ -790,7 +824,7 @@ a:hover { text-decoration: underline; }
   padding: 8px 16px;
   font-size: 12px;
 }
-.status-bar--ok { background: rgba(92, 122, 92, 0.10); color: var(--success); }
+.status-bar--ok { background: rgba(var(--success-rgb), 0.10); color: var(--success); }
 .status-bar--info { background: rgba(var(--primary-rgb), 0.08); color: var(--primary); }
 .status-bar--muted { background: var(--bg); color: var(--muted); }
 .status-bar__text { flex: 1; font-weight: 600; }
@@ -1315,6 +1349,6 @@ a:hover { text-decoration: underline; }
   color: var(--danger);
 }
 .tag--paid {
-  background: rgba(92, 122, 92, 0.12);
+  background: rgba(var(--success-rgb), 0.12);
   color: var(--success);
 }

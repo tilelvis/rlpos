@@ -17,12 +17,18 @@ import './styles/main.css';
 
 import { SeedService } from './core/services/seed.js';
 import { StorageService } from './core/services/storage.js';
+import { ThemeService } from './core/services/theme_service.js';
 import { wireAuthToStorageService } from './core/store.js';
 import { AuthProvider } from './core/providers/auth.js';
 import { registerRoutes } from './routes.js';
 import { bootRouter } from './core/router.js';
 
 async function main() {
+  // Re-assert the stored theme preference (index.html already applied
+  // it synchronously pre-paint — this just keeps ThemeService's own
+  // notion of "current" in sync for the toggle button).
+  ThemeService.init();
+
   // If a new service worker takes control while this page is open,
   // reload once so the POS immediately uses the new application build.
   if ('serviceWorker' in navigator) {

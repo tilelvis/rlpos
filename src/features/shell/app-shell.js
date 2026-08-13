@@ -25,6 +25,7 @@ import { renderReports } from '../reports/reports.js';
 import { renderMenuManagement } from '../menu/menu-management.js';
 import { renderSettings } from '../settings/business-settings.js';
 import { showPrinterQuickAccessDialog } from '../printer/usb-printer-widget.js';
+import { ThemeService } from '../../core/services/theme_service.js';
 import { showStaffLoginModal } from '../auth/staff-login-modal.js';
 import { renderUnpaidNotif, refreshUnpaidNotif } from '../orders/unpaid-notif.js';
 
@@ -142,6 +143,21 @@ function drawAppbar(appbar) {
       'aria-label': 'Printer connection',
       onclick: () => showPrinterQuickAccessDialog(),
     }, [h('span', { class: 'icon material-symbols-outlined' }, ['print'])]),
+  );
+
+  // Theme toggle — visible to everyone, persisted per-device.
+  appbar.append(
+    h('button', {
+      class: 'btn btn--icon',
+      title: ThemeService.current === 'dark' ? 'Switch to light theme' : 'Switch to dark theme',
+      'aria-label': 'Toggle dark mode',
+      onclick: () => {
+        ThemeService.toggle();
+        drawAppbar(appbar);
+      },
+    }, [h('span', { class: 'icon material-symbols-outlined' }, [
+      ThemeService.current === 'dark' ? 'light_mode' : 'dark_mode',
+    ])]),
   );
 
   if (user) {
