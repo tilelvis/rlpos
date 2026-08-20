@@ -5,11 +5,7 @@
 // (waiters and guests don't see it — they can't mark orders as paid).
 //
 // Clicking the chip opens a modal listing all unpaid orders. Each row
-// has a "Confirm payment" button that opens a SECOND modal asking the
-// admin/cashier to choose a payment type (Cash or M-Pesa Paybill) and
-// optionally enter a reference (e.g. M-Pesa confirmation code) before
-// the order is marked as paid. This two-step flow ensures we always
-// capture HOW an order was paid, not just THAT it was paid.
+// has a "Confirm payment" button that marks the order as paid (cash).
 
 import { h, clear, toast, formatMoney, formatDate, showModal } from '../../core/ui.js';
 import { AuthProvider } from '../../core/providers/auth.js';
@@ -138,11 +134,10 @@ function openUnpaidOrdersModal() {
 }
 
 /**
- * Opens a modal to confirm payment for a specific order. SWIFT flow:
- * the admin/cashier selects the payment type (Cash or M-Pesa) and
- * taps "Confirm" — that's it. No reference codes, no extra inputs.
- * The order is immediately marked as paid with the chosen payment
- * type and the unpaid table updates.
+ * Opens a modal to confirm payment for a specific order. The
+ * admin/cashier picks how it was paid — Cash or M-Pesa — and taps
+ * "Confirm". No reference/transaction code field; this just records
+ * the method, not a confirmation code.
  *
  * Receipts are NOT printed here — printing already happened at the
  * Complete Sale step. This modal only records HOW the order was paid.

@@ -155,6 +155,22 @@ function drawSalesTab(body) {
           h('span', { class: 'icon material-symbols-outlined', style: { fontSize: '18px' } }, ['date_range']),
           'This Week',
         ]),
+        h('button', {
+          class: 'btn btn--outlined',
+          style: { flex: '1' },
+          onclick: async () => {
+            try {
+              const bytes = await ReportService.buildMonthlyReport(new Date());
+              const key = formatDate(new Date(), 'MM-yyyy');
+              FileDownloadService.downloadBytes(bytes, `monthly-sales-report-${key}.xlsx`, FileDownloadService.xlsxMimeType);
+            } catch (e) {
+              toast(`Report failed: ${e.message}`, { type: 'error' });
+            }
+          },
+        }, [
+          h('span', { class: 'icon material-symbols-outlined', style: { fontSize: '18px' } }, ['calendar_month']),
+          'This Month',
+        ]),
       ]),
     ]),
   );
@@ -192,6 +208,34 @@ function drawSalesTab(body) {
         h('div', { style: { fontSize: '24px', fontWeight: '800' } }, [String(completed.length)]),
       ]),
     ]),
+  );
+
+  // ---- Payment breakdown ----
+  const cashOrders = completed.filter((o) => o.paid && o.paymentType === 'cash');
+  const mpesaOrders = completed.filter((o) => o.paid && o.paymentType === 'mpesa');
+  const unpaidOrders = completed.filter((o) => !o.paid);
+  const paymentRows = [
+    { label: 'Cash', icon: 'payments', count: cashOrders.length, total: cashOrders.reduce((s, o) => s + o.total, 0), color: 'var(--success)', bg: 'rgba(var(--success-rgb), 0.12)' },
+    { label: 'M-Pesa', icon: 'smartphone', count: mpesaOrders.length, total: mpesaOrders.reduce((s, o) => s + o.total, 0), color: 'var(--accent)', bg: 'rgba(var(--accent-rgb), 0.14)' },
+    { label: 'Unpaid', icon: 'schedule', count: unpaidOrders.length, total: unpaidOrders.reduce((s, o) => s + o.total, 0), color: 'var(--danger)', bg: 'rgba(var(--danger-rgb), 0.12)' },
+  ];
+  body.append(
+    h('div', { style: { height: '24px' } }, []),
+    h('h2', { class: 'section-title', style: { margin: '0 0 8px' } }, ['Payment Breakdown']),
+    h('div', { class: 'card', style: { padding: '0' } },
+      paymentRows.map((p) =>
+        h('div', { class: 'list-item' }, [
+          h('div', { class: 'list-item__avatar', style: { background: p.bg, color: p.color } }, [
+            h('span', { class: 'icon material-symbols-outlined' }, [p.icon]),
+          ]),
+          h('div', { class: 'list-item__main' }, [
+            h('div', { class: 'list-item__title' }, [p.label]),
+            h('div', { class: 'list-item__subtitle' }, [`${p.count} order${p.count === 1 ? '' : 's'}`]),
+          ]),
+          h('div', { class: 'list-item__trailing', style: { color: p.color } }, [formatMoney0(p.total)]),
+        ]),
+      ),
+    ),
   );
 
   // ---- Daily sales chart ----
@@ -338,6 +382,7 @@ async function restoreFromBackup() {
 
 function drawReceiptsTab(body) {
   const receipts = ReceiptsProvider.receipts;
+  const ordersById = new Map(OrdersProvider.orders.map((o) => [o.id, o]));
 
   body.append(
     h('div', { class: 'card' }, [
@@ -359,12 +404,19 @@ function drawReceiptsTab(body) {
 
   const card = h('div', { class: 'card', style: { marginTop: '12px', padding: '0' } }, []);
   for (const r of receipts) {
+    const order = ordersById.get(r.orderId);
+    const paid = order?.paid ?? true; // pre-payment-tracking receipts default to paid
+    const paymentLabel = order?.paymentLabel ?? 'Paid';
     const row = h('div', { class: 'list-item' }, [
       h('div', { class: 'list-item__avatar' }, [r.receiptNumber.substring(0, 3)]),
       h('div', { class: 'list-item__main' }, [
         h('div', { class: 'list-item__title' }, [
           h('strong', {}, [`#${r.receiptNumber}`]),
           h('span', { style: { color: 'var(--muted)', fontSize: '12px', fontWeight: 'normal', marginLeft: '8px' } }, [r.orderNumber]),
+          h('span', {
+            class: `tag ${paid ? (order?.paymentType === 'mpesa' ? 'tag--mpesa' : 'tag--paid') : 'tag--unpaid'}`,
+            style: { marginLeft: '8px' },
+          }, [paid ? paymentLabel : 'Unpaid']),
         ]),
         h('div', { class: 'list-item__subtitle' }, [
           `${formatDate(r.issuedAt, 'dd/MM/yyyy hh:mm a')} · ${r.cashierName}` +

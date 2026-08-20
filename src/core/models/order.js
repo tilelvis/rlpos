@@ -38,7 +38,7 @@ export class Order {
     paidById = null,
     paidByName = null,
     paymentType = null,    // 'cash' | 'mpesa' | null (not yet paid)
-    paymentRef = null,    // e.g. M-Pesa confirmation code, or null for cash
+    paymentRef = null,    // optional reference; no UI field collects this currently
   }) {
     this.id = id;
     this.orderNumber = orderNumber;
@@ -112,8 +112,7 @@ export class Order {
   }
 
   /** Mark this order as paid by the given user, with the given payment
-   *  type ('cash' or 'mpesa') and optional reference (e.g. M-Pesa
-   *  confirmation code). Returns a new Order. */
+   *  type ('cash' or 'mpesa'). Returns a new Order. */
   markPaidBy(user, { paymentType = 'cash', paymentRef = null } = {}) {
     return this.copyWith({
       paid: true,

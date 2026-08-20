@@ -17,6 +17,12 @@ const STATUS_COLORS = {
   completed: 'var(--success)',
   voided: 'var(--muted)',
 };
+const STATUS_BG = {
+  open: 'rgba(var(--accent-rgb), 0.14)',
+  held: 'rgba(var(--warning-rgb), 0.15)',
+  completed: 'rgba(var(--success-rgb), 0.12)',
+  voided: 'rgba(var(--muted-rgb), 0.10)',
+};
 const STATUS_ICONS = {
   open: 'edit_note',
   held: 'pause_circle',
@@ -76,7 +82,7 @@ export function renderOrderHistory(content) {
       }, [
         h('div', {
           class: 'list-item__avatar',
-          style: { background: `${statusColor}1f`, color: statusColor },
+          style: { background: STATUS_BG[o.status] || 'rgba(var(--muted-rgb), 0.10)', color: statusColor },
         }, [
           h('span', { class: 'icon material-symbols-outlined' }, [STATUS_ICONS[o.status] || 'circle']),
         ]),
@@ -87,12 +93,15 @@ export function renderOrderHistory(content) {
               class: `tag tag--${o.status === 'completed' ? 'success' : o.status === 'held' ? 'purple' : o.status === 'voided' ? 'muted' : 'warning'}`,
               style: { marginLeft: '8px' },
             }, [o.statusLabel]),
-            // Show paid/unpaid badge on completed orders.
+            // Show paid/unpaid badge on completed orders — when paid,
+            // the badge names the actual payment method (Cash / M-Pesa)
+            // rather than a generic "Paid" so the method is visible at
+            // a glance in the order table, not just inside the receipt.
             o.status === 'completed'
               ? h('span', {
-                  class: `tag ${o.paid ? 'tag--paid' : 'tag--unpaid'}`,
+                  class: `tag ${o.paid ? (o.paymentType === 'mpesa' ? 'tag--mpesa' : 'tag--cash') : 'tag--unpaid'}`,
                   style: { marginLeft: '4px' },
-                }, [o.paid ? 'Paid' : 'Unpaid'])
+                }, [o.paid ? o.paymentLabel : 'Unpaid'])
               : null,
           ]),
           h('div', { class: 'list-item__subtitle' }, [

@@ -135,7 +135,7 @@ export const OrdersProvider = {
    *  @param {User} user - the admin/cashier confirming payment
    *  @param {Object} opts
    *  @param {string} opts.paymentType - 'cash' | 'mpesa'
-   *  @param {string|null} opts.paymentRef - optional reference (e.g. M-Pesa confirmation code)
+   *  @param {string|null} opts.paymentRef - optional reference; unused (no UI field for it)
    */
   async markPaid(orderId, user, { paymentType = 'cash', paymentRef = null } = {}) {
     const o = StorageService.findOrder(orderId);

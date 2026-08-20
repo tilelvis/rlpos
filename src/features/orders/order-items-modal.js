@@ -10,6 +10,7 @@
 
 import { h, showModal, formatMoney, formatDate } from '../../core/ui.js';
 import { AuthProvider } from '../../core/providers/auth.js';
+import { OrdersProvider } from '../../core/providers/orders.js';
 import { openConfirmPaymentModal } from './unpaid-notif.js';
 
 /**
@@ -68,7 +69,9 @@ export function showOrderModal(order) {
   const badges = [];
   if (order.status === 'completed') {
     badges.push(
-      h('span', { class: `tag ${order.paid ? 'tag--paid' : 'tag--unpaid'}` }, [order.paid ? 'Paid' : 'Unpaid']),
+      h('span', {
+        class: `tag ${order.paid ? (order.paymentType === 'mpesa' ? 'tag--mpesa' : 'tag--cash') : 'tag--unpaid'}`,
+      }, [order.paid ? order.paymentLabel : 'Unpaid']),
     );
   } else {
     badges.push(h('span', { class: 'tag' }, [order.statusLabel]));
@@ -107,7 +110,18 @@ export function showOrderModal(order) {
 
 /** Convenience wrapper for a Receipt (receipt-history.js, reports.js). */
 export function showReceiptModal(receipt) {
+  // Payment info (cash/M-Pesa/unpaid) lives on the Order, not the
+  // Receipt snapshot — look it up so the badge reflects current status
+  // even if it was marked paid after the receipt was issued.
+  const order = OrdersProvider.orders.find((o) => o.id === receipt.orderId);
   const badges = [];
+  if (order) {
+    badges.push(
+      h('span', {
+        class: `tag ${order.paid ? (order.paymentType === 'mpesa' ? 'tag--mpesa' : 'tag--cash') : 'tag--unpaid'}`,
+      }, [order.paid ? order.paymentLabel : 'Unpaid']),
+    );
+  }
   if (receipt.reprintCount > 0) {
     badges.push(h('span', { class: 'tag' }, [`Reprinted ×${receipt.reprintCount}`]));
   }

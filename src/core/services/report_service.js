@@ -76,6 +76,20 @@ export const ReportService = {
     });
   },
 
+  async buildMonthlyReport(anyDayInMonth) {
+    const d = new Date(anyDayInMonth.getFullYear(), anyDayInMonth.getMonth(), 1);
+    const end = new Date(d.getFullYear(), d.getMonth() + 1, 1);
+    const lastDay = new Date(end.getTime() - 24 * 60 * 60 * 1000);
+    const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    return this._build({
+      rangeStart: d,
+      rangeEnd: end,
+      title: `Monthly Sales Report — ${months[d.getMonth()]} ${d.getFullYear()}`,
+      dailyBreakdown: true,
+      dailyBreakdownDays: Math.round((lastDay.getTime() - d.getTime()) / (24 * 60 * 60 * 1000)) + 1,
+    });
+  },
+
   async buildWeeklyReport(anyDayInWeek) {
     const d = new Date(anyDayInWeek.getFullYear(), anyDayInWeek.getMonth(), anyDayInWeek.getDate());
     const monday = new Date(d);
@@ -90,7 +104,7 @@ export const ReportService = {
     });
   },
 
-  async _build({ rangeStart, rangeEnd, title, dailyBreakdown = false }) {
+  async _build({ rangeStart, rangeEnd, title, dailyBreakdown = false, dailyBreakdownDays = 7 }) {
     const XLSX = await getXlsx();
 
     const allOrders = StorageService.orders.filter((o) => {
@@ -110,6 +124,14 @@ export const ReportService = {
     const totalItems = completed.reduce((s, o) => s + o.itemCount, 0);
     const avgTicket = completed.length === 0 ? 0 : totalRevenue / completed.length;
 
+    // ---- Payment breakdown (cash vs M-Pesa vs still-unpaid) ----
+    const cashOrders = completed.filter((o) => o.paid && o.paymentType === 'cash');
+    const mpesaOrders = completed.filter((o) => o.paid && o.paymentType === 'mpesa');
+    const unpaidOrders = completed.filter((o) => !o.paid);
+    const cashTotal = cashOrders.reduce((s, o) => s + o.total, 0);
+    const mpesaTotal = mpesaOrders.reduce((s, o) => s + o.total, 0);
+    const unpaidTotal = unpaidOrders.reduce((s, o) => s + o.total, 0);
+
     const summaryData = [
       [title],
       ['Generated', fmtDate(new Date(), 'dd/MM/yyyy HH:mm')],
@@ -119,13 +141,18 @@ export const ReportService = {
       ['Voided Orders', voided.length],
       ['Items Sold', totalItems],
       ['Average Ticket (KES)', Number(avgTicket.toFixed(2))],
+      [''],
+      ['Payment Breakdown', 'Orders', 'Amount (KES)'],
+      ['Cash', cashOrders.length, Number(cashTotal.toFixed(2))],
+      ['M-Pesa', mpesaOrders.length, Number(mpesaTotal.toFixed(2))],
+      ['Unpaid (outstanding)', unpaidOrders.length, Number(unpaidTotal.toFixed(2))],
     ];
     const wsSummary = XLSX.utils.aoa_to_sheet(summaryData);
     XLSX.utils.book_append_sheet(wb, wsSummary, 'Summary');
 
     // ---- Sales (one row per order) ----
     const salesHeader = [
-      'Order #', 'Date', 'Time', 'Taken By', 'Items', 'Total (KES)', 'Status',
+      'Order #', 'Date', 'Time', 'Taken By', 'Items', 'Total (KES)', 'Status', 'Payment Method',
     ];
     const salesData = [salesHeader];
     for (const o of allOrders) {
@@ -137,6 +164,7 @@ export const ReportService = {
         o.itemCount,
         Number(o.total.toFixed(2)),
         o.statusLabel,
+        o.status === 'completed' ? o.paymentLabel : '—',
       ]);
     }
     const wsSales = XLSX.utils.aoa_to_sheet(salesData);
@@ -197,11 +225,11 @@ export const ReportService = {
     const wsBest = XLSX.utils.aoa_to_sheet(bestData);
     XLSX.utils.book_append_sheet(wb, wsBest, 'Best Sellers');
 
-    // ---- Daily breakdown (weekly reports only) ----
+    // ---- Daily breakdown (weekly/monthly reports) ----
     if (dailyBreakdown) {
-      const dailyHeader = ['Date', 'Completed Orders', 'Revenue (KES)'];
+      const dailyHeader = ['Date', 'Completed Orders', 'Cash (KES)', 'M-Pesa (KES)', 'Unpaid (KES)', 'Revenue (KES)'];
       const dailyData = [dailyHeader];
-      for (let i = 0; i < 7; i++) {
+      for (let i = 0; i < dailyBreakdownDays; i++) {
         const d = new Date(rangeStart.getTime() + i * 24 * 60 * 60 * 1000);
         const dOrders = completed.filter((o) => {
           const c = o.completedAt ? new Date(o.completedAt) : null;
@@ -211,9 +239,15 @@ export const ReportService = {
                  c.getDate() === d.getDate();
         });
         const rev = dOrders.reduce((s, o) => s + o.total, 0);
+        const dCash = dOrders.filter((o) => o.paid && o.paymentType === 'cash').reduce((s, o) => s + o.total, 0);
+        const dMpesa = dOrders.filter((o) => o.paid && o.paymentType === 'mpesa').reduce((s, o) => s + o.total, 0);
+        const dUnpaid = dOrders.filter((o) => !o.paid).reduce((s, o) => s + o.total, 0);
         dailyData.push([
-          fmtDate(d, 'EEE dd/MM'),
+          fmtDate(d, dailyBreakdownDays > 7 ? 'dd MMM yyyy' : 'EEE dd/MM'),
           dOrders.length,
+          Number(dCash.toFixed(2)),
+          Number(dMpesa.toFixed(2)),
+          Number(dUnpaid.toFixed(2)),
           Number(rev.toFixed(2)),
         ]);
       }

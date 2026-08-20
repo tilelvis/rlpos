@@ -19,6 +19,7 @@
   --muted: #79766D;
   --success: #5C7A5C;
   --danger: #A8503B;
+  --danger-rgb: 168, 80, 59;
   --divider: #E3E0D8;
   --warning: #B8903E;
   --radius-sm: 4px;
@@ -56,6 +57,7 @@ html[data-theme="dark"] {
   --muted: #948F82;
   --success: #7FA07F;
   --danger: #C2795D;
+  --danger-rgb: 194, 121, 93;
   --divider: #37352F;
   --warning: #D1A855;
   --shadow-card: 0 1px 2px rgba(0,0,0,0.24);
@@ -1472,4 +1474,12 @@ a:hover { text-decoration: underline; }
 .tag--paid {
   background: rgba(var(--success-rgb), 0.12);
   color: var(--success);
+}
+.tag--cash {
+  background: rgba(var(--success-rgb), 0.12);
+  color: var(--success);
+}
+.tag--mpesa {
+  background: rgba(var(--accent-rgb), 0.14);
+  color: var(--accent);
 }

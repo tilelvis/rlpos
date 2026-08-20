@@ -2,6 +2,7 @@
 
 import { h, clear, formatMoney, formatDate } from '../../core/ui.js';
 import { ReceiptsProvider } from '../../core/providers/receipts.js';
+import { OrdersProvider } from '../../core/providers/orders.js';
 import { showReceiptModal } from '../orders/order-items-modal.js';
 
 export function renderReceiptHistory(content) {
@@ -22,8 +23,12 @@ export function renderReceiptHistory(content) {
 
   const root = h('div', { style: { padding: '16px', maxWidth: '900px', margin: '0 auto' } }, []);
 
+  const ordersById = new Map(OrdersProvider.orders.map((o) => [o.id, o]));
   const card = h('div', { class: 'card', style: { padding: '0' } }, []);
   for (const r of receipts) {
+    const order = ordersById.get(r.orderId);
+    const paid = order?.paid ?? true;
+    const paymentLabel = order?.paymentLabel ?? 'Paid';
     card.append(
       h('div', {
         class: 'list-item',
@@ -34,6 +39,10 @@ export function renderReceiptHistory(content) {
           h('div', { class: 'list-item__title' }, [
             `#${r.receiptNumber}`,
             h('span', { style: { color: 'var(--muted)', fontSize: '12px', fontWeight: 'normal', marginLeft: '8px' } }, [r.orderNumber]),
+            h('span', {
+              class: `tag ${paid ? (order?.paymentType === 'mpesa' ? 'tag--mpesa' : 'tag--cash') : 'tag--unpaid'}`,
+              style: { marginLeft: '8px' },
+            }, [paid ? paymentLabel : 'Unpaid']),
           ]),
           h('div', { class: 'list-item__subtitle' }, [
             `${formatDate(r.issuedAt, 'dd/MM/yyyy hh:mm a')} · Cashier: ${r.cashierName}` +
