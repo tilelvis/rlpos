@@ -23,6 +23,26 @@ import { store, CHANNELS } from '../../core/store.js';
 import { showReceiptModal } from '../orders/order-items-modal.js';
 
 let _subtab = 'sales'; // 'sales' | 'receipts'
+let _pickedDateStr = toDateInputValue(new Date()); // for "Download a Specific Date"
+
+/** Formats a Date as "YYYY-MM-DD" using LOCAL calendar fields — for
+ *  <input type="date"> value/max attributes. Deliberately not
+ *  toISOString() (that's UTC and can land on the wrong day depending
+ *  on timezone). */
+function toDateInputValue(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+/** Parses an <input type="date"> value ("YYYY-MM-DD") back into a
+ *  local-midnight Date — the inverse of toDateInputValue(), and what
+ *  ReportService.buildDailyReport() expects. */
+function parseDateInputValue(s) {
+  const [y, m, d] = s.split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
 
 export function renderReports(content) {
   clear(content);
@@ -170,6 +190,47 @@ function drawSalesTab(body) {
         }, [
           h('span', { class: 'icon material-symbols-outlined', style: { fontSize: '18px' } }, ['calendar_month']),
           'This Month',
+        ]),
+      ]),
+    ]),
+  );
+
+  // ---- Download a specific date ----
+  body.append(
+    h('div', { style: { height: '20px' } }, []),
+    h('div', { class: 'card' }, [
+      h('h2', { class: 'section-title', style: { margin: '0 0 4px' } }, ['Download a Specific Date']),
+      h('p', { style: { color: 'var(--muted)', fontSize: '12px', marginTop: '0' } }, [
+        "Pick any past date to download that day's sales report — useful for a date the buttons above don't cover.",
+      ]),
+      h('div', { class: 'row', style: { gap: '8px', alignItems: 'center' } }, [
+        h('input', {
+          type: 'date',
+          class: 'input',
+          style: { flex: '1' },
+          value: _pickedDateStr,
+          max: toDateInputValue(new Date()),
+          onchange: (e) => { _pickedDateStr = e.target.value; },
+        }),
+        h('button', {
+          class: 'btn btn--outlined',
+          onclick: async () => {
+            if (!_pickedDateStr) {
+              toast('Pick a date first.', { type: 'warning' });
+              return;
+            }
+            const date = parseDateInputValue(_pickedDateStr);
+            try {
+              const bytes = await ReportService.buildDailyReport(date);
+              const key = formatDate(date, 'dd/MM/yyyy');
+              FileDownloadService.downloadBytes(bytes, `sales-report-${key}.xlsx`, FileDownloadService.xlsxMimeType);
+            } catch (e) {
+              toast(`Report failed: ${e.message}`, { type: 'error' });
+            }
+          },
+        }, [
+          h('span', { class: 'icon material-symbols-outlined', style: { fontSize: '18px' } }, ['download']),
+          'Download',
         ]),
       ]),
     ]),
