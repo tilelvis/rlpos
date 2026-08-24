@@ -5,6 +5,7 @@
 
 import { h, clear, formatMoney, formatDate, toast } from '../../core/ui.js';
 import { OrdersProvider } from '../../core/providers/orders.js';
+import { ReceiptsProvider } from '../../core/providers/receipts.js';
 import { CartProvider } from '../../core/providers/menu.js';
 import { AuthProvider } from '../../core/providers/auth.js';
 import { navigate } from '../../core/router.js';
@@ -109,6 +110,28 @@ export function renderOrderHistory(content) {
           ]),
         ]),
         h('div', { class: 'list-item__trailing' }, [formatMoney(o.total)]),
+        (o.status === 'completed' && user.isAdmin)
+          ? h('button', {
+              class: 'btn btn--outlined btn--icon-only',
+              title: 'Reprint receipt',
+              onclick: async (e) => {
+                e.stopPropagation();
+                const receipt = ReceiptsProvider.findByOrderId(o.id);
+                if (!receipt) {
+                  toast('No receipt found for this order.', { type: 'error' });
+                  return;
+                }
+                // No saleContext set here — the receipt-preview page
+                // treats that as "admin/cashier reprint" (see its
+                // comments): it stays logged in as the current admin,
+                // skips the waiter auto-logout + "orders today" toast,
+                // and just shows print / USB print / PDF actions.
+                navigate(`/receipts/${receipt.id}`);
+              },
+            }, [
+              h('span', { class: 'icon material-symbols-outlined', style: { fontSize: '18px' } }, ['print']),
+            ])
+          : null,
       ]),
     );
   }
