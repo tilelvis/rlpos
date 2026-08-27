@@ -90,11 +90,15 @@ export function showStaffLoginModal() {
   requestAnimationFrame(() => overlay.classList.add('modal--visible'));
 
   let settled = false;
-  function close() {
+  function close({ immediate = false } = {}) {
     if (settled) return;
     settled = true;
     overlay.classList.remove('modal--visible');
-    setTimeout(() => overlay.remove(), 200);
+    if (immediate) {
+      overlay.remove();
+    } else {
+      setTimeout(() => overlay.remove(), 200);
+    }
   }
 
   async function submit() {
@@ -108,8 +112,11 @@ export function showStaffLoginModal() {
       return;
     }
 
-    const user = AuthProvider.signIn(username, password);
-    if (!user) {
+    // Validate before publishing the auth event. The shell intentionally
+    // avoids heavy re-renders while a modal is present, so remove this
+    // modal synchronously before signing in.
+    const candidate = StorageService.findUser(username);
+    if (!candidate || candidate.password !== password) {
       errorEl.textContent = 'Invalid password. Please try again.';
       passwordInput.focus();
       passwordInput.select();
@@ -117,19 +124,16 @@ export function showStaffLoginModal() {
     }
 
     // Defensive: confirm the signed-in user is actually admin/cashier.
-    if (!user.canViewFinancials) {
-      AuthProvider.signOut();
+    if (!candidate.canViewFinancials) {
       errorEl.textContent = 'Only admins and cashiers can sign in here.';
       return;
     }
 
+    close({ immediate: true });
+    const user = AuthProvider.signIn(username, password);
+    if (!user) return;
+
     toast(`Signed in as ${user.displayName}`, { type: 'success' });
-    // Defer close() to the next tick so the auth state change (which
-    // triggers synchronous re-renders of the app shell + dashboard)
-    // has a chance to settle before we remove the modal from the DOM.
-    // Without this, the modal removal can race with the re-render and
-    // wedge the event loop in some browsers.
-    setTimeout(close, 0);
   }
 
   submitBtn.addEventListener('click', submit);
