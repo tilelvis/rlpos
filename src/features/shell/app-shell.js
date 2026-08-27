@@ -100,10 +100,8 @@ export function renderAppShell({ initialView = 'dashboard' } = {}) {
     if (document.querySelector('.modal')) return;
     if (_state.view === 'reports') drawContent(content);
   }));
-  _listeners.push(store.subscribe(CHANNELS.cart, () => {
-    if (document.querySelector('.modal')) return;
-    if (_state.view === 'new-order') drawContent(content);
-  }));
+  // The new-order view owns its cart subscription so it can update the
+  // cart without rebuilding the menu and losing the selected category.
 
   window.addEventListener('app:navigate', (e) => {
     const { view } = e.detail || {};
