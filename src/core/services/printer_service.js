@@ -52,6 +52,11 @@ function notifyUsb(state) {
   }
 }
 
+// If the printer physically drops off the bus (unplugged, power blip,
+// or a send() that couldn't recover), reflect that immediately instead
+// of leaving stale UI claiming we're still connected.
+_usb.onDisconnect(() => notifyUsb(UsbConnectionState.disconnected()));
+
 // PDF export is dynamically imported so the main bundle stays small.
 // jsPDF is loaded only when the user actually clicks "Export PDF".
 let _jspdfPromise = null;
@@ -106,18 +111,37 @@ export const PrinterService = {
   // ---- Direct WebUSB ESC/POS printing ----
 
   /** Send raw ESC/POS commands for one copy of the receipt directly to
-   *  the paired USB thermal printer. Throws if no printer is connected. */
+   *  the paired USB thermal printer. Throws if no printer is connected.
+   *
+   *  If the transfer fails because the device dropped (see
+   *  WebUsbPrinter.send), makes ONE silent reconnect-and-retry attempt
+   *  before giving up — this recovers from the common case where
+   *  Windows briefly suspended the USB port between prints. */
   async printReceiptUsb(receipt, { copyType = 'customer' } = {}) {
     const cols = PAPER_WIDTHS[receipt.paperWidth]?.columns ?? 32;
     const text = ReceiptService.generate(receipt, copyType);
     const bytes = EscPosBuilder.fromPlainText(text, { cols });
-    await _usb.send(bytes);
+    try {
+      await _usb.send(bytes);
+    } catch (e) {
+      if (_usb.isConnected) throw e; // real failure, not a dropped device
+      const reconnected = await _usb.tryReconnect();
+      if (!reconnected) throw e;
+      notifyUsb(UsbConnectionState.connected(_usb.deviceName));
+      await _usb.send(bytes);
+    }
   },
 
   /** Print both copies (customer then business) to the paired USB
-   *  thermal printer as two separate tickets. */
+   *  thermal printer as two separate tickets.
+   *
+   *  Waits after the cut before sending the next copy — most budget
+   *  ESC/POS boards are still busy with the cutter motor for a few
+   *  hundred ms after a cut command, and sending straight into that
+   *  is what stalls the endpoint. */
   async printReceiptUsbBothCopies(receipt) {
     await this.printReceiptUsb(receipt, { copyType: 'customer' });
+    await new Promise((r) => setTimeout(r, 400));
     await this.printReceiptUsb(receipt, { copyType: 'business' });
   },
 
