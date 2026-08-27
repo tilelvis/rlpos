@@ -325,11 +325,13 @@ a:hover { text-decoration: underline; }
   transition: transform 0.22s ease, font-size 0.22s ease;
 }
 .bottomnav__item.active > span:not(.icon) {
+  position: absolute;
+  top: 7px;
   font-size: 12px;
-  transform: translateY(-15px) scale(1.04);
+  transform: scale(1.04);
 }
 .bottomnav__item.active .icon {
-  transform: translateY(8px);
+  transform: translateY(3px);
 }
 .bottomnav__item:hover {
   color: var(--primary);
