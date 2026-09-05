@@ -7,7 +7,6 @@ import { h, clear, toast, showModal } from '../../core/ui.js';
 import { BusinessProvider, UserManagement } from '../../core/providers/auth.js';
 import { AuthProvider } from '../../core/providers/auth.js';
 import { StorageService } from '../../core/services/storage.js';
-import { SeedService } from '../../core/services/seed.js';
 import { BusinessInfo } from '../../core/models/business_info.js';
 import { USER_ROLES } from '../../core/models/user.js';
 import { navigate } from '../../core/router.js';
@@ -330,10 +329,10 @@ export function renderSettings(content) {
             lineHeight: '1.4',
           },
         }, [
-          'This permanently deletes every order, receipt, and menu item on this device, and signs out every user account. ',
+          'This permanently deletes every order, receipt, menu item, and user account on this device. ',
           h('strong', {}, ['This cannot be undone.']),
           h('br'), h('br'),
-          'The default admin login (admin / admin123) and demo users are restored afterward so the device is usable again — your shop\'s business profile, M-Pesa numbers, and printer setup are kept as-is.',
+          'The app reloads afterward and asks you to create a new admin account — your shop\'s business profile, M-Pesa numbers, and printer setup are kept as-is.',
         ]),
         h('div', { class: 'field', style: { marginTop: '16px' } }, [
           h('label', {}, ['Type PURGE to confirm']),
@@ -398,11 +397,13 @@ export function renderSettings(content) {
           try {
             await StorageService.clearOperationalData();
             await StorageService.saveBusiness(BusinessProvider.info); // keep business profile
-            await SeedService.ensureSeeded({ force: true });
-            toast('System reset complete. Re-seeding users.', { type: 'success' });
+            toast('System reset complete. Reloading\u2026', { type: 'success' });
             dlg.close();
-            AuthProvider.signOut();
-            navigate('/login');
+            // Reload rather than re-routing in-place: this re-runs main.js's
+            // boot check, which sees zero users and shows the first-run
+            // admin setup screen (see src/main.js), instead of leaving any
+            // stale shell/store state from the just-purged session around.
+            setTimeout(() => window.location.reload(), 600);
           } catch (e) {
             state.error = `Reset failed: ${e.message}`;
             state.running = false;

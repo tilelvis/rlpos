@@ -11,13 +11,6 @@ export const DEFAULT_BUSINESS = {
   footerMessage: 'THANK YOU\nPLEASE VISIT AGAIN',
 };
 
-// Demo credentials — same as the Flutter app.
-export const DEMO = {
-  admin: { username: 'admin', password: 'admin123', displayName: 'Site Admin', role: 'admin' },
-  cashier: { username: 'elvis', password: '1234', displayName: 'Elvis', role: 'cashier' },
-  waiter: { username: 'mary', password: '1234', displayName: 'Mary', role: 'waiter' },
-};
-
 // Receipt widths in millimeters (thermal paper).
 export const PAPER_WIDTHS = {
   mm58: { mm: 58, columns: 32, label: '58mm' },

@@ -8,7 +8,6 @@
 
 import { h, toast } from '../../core/ui.js';
 import { AuthProvider } from '../../core/providers/auth.js';
-import { DEMO } from '../../core/constants.js';
 
 export function showLoginModal({ title = 'Sign in to complete sale', subtitle = 'Your sign-in acts as a signature for this sale.' } = {}) {
   return new Promise((resolve) => {

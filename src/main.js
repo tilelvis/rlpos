@@ -22,6 +22,7 @@ import { wireAuthToStorageService } from './core/store.js';
 import { AuthProvider } from './core/providers/auth.js';
 import { registerRoutes } from './routes.js';
 import { bootRouter } from './core/router.js';
+import { renderFirstRunSetup } from './features/auth/first-run-setup.js';
 
 async function main() {
   // Re-assert the stored theme preference (index.html already applied
@@ -48,17 +49,31 @@ async function main() {
   // See AuthProvider.restore() for the filtering logic.
   AuthProvider.restore();
 
-  // Register all routes.
-  registerRoutes();
+  function hideLoading() {
+    const loading = document.getElementById('loading');
+    if (loading) {
+      loading.classList.add('hidden');
+      setTimeout(() => loading.remove(), 500);
+    }
+  }
 
-  // Boot the router — this renders the first screen.
-  bootRouter();
+  function boot() {
+    // Register all routes.
+    registerRoutes();
+    // Boot the router — this renders the first screen.
+    bootRouter();
+    hideLoading();
+  }
 
-  // Hide the loading screen once the first screen has mounted.
-  const loading = document.getElementById('loading');
-  if (loading) {
-    loading.classList.add('hidden');
-    setTimeout(() => loading.remove(), 500);
+  // No accounts exist yet — either a fresh install, or right after a
+  // "Full system reset". There is no seeded admin anymore (see seed.js),
+  // so block normal routing until the owner creates their own admin
+  // login. Once that account is created and signed in, boot() proceeds
+  // exactly as it would on a normal launch.
+  if (StorageService.users.length === 0) {
+    renderFirstRunSetup(boot);
+  } else {
+    boot();
   }
 }
 
