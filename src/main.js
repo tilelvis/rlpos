@@ -72,6 +72,7 @@ async function main() {
   // exactly as it would on a normal launch.
   if (StorageService.users.length === 0) {
     renderFirstRunSetup(boot);
+    hideLoading();
   } else {
     boot();
   }
