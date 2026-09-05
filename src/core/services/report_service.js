@@ -152,7 +152,7 @@ export const ReportService = {
 
     // ---- Sales (one row per order) ----
     const salesHeader = [
-      'Order #', 'Date', 'Time', 'Taken By', 'Items', 'Total (KES)', 'Status', 'Payment Method',
+      'Order #', 'Date', 'Time', 'Taken By', 'Items', 'Total (KES)', 'Status', 'Payment Method', 'Paid Date', 'Paid Time',
     ];
     const salesData = [salesHeader];
     for (const o of allOrders) {
@@ -165,6 +165,8 @@ export const ReportService = {
         Number(o.total.toFixed(2)),
         o.statusLabel,
         o.status === 'completed' ? o.paymentLabel : '—',
+        o.paid && o.paidAt ? fmtDate(o.paidAt, 'dd/MM/yyyy') : '—',
+        o.paid && o.paidAt ? fmtDate(o.paidAt, 'HH:mm') : '—',
       ]);
     }
     const wsSales = XLSX.utils.aoa_to_sheet(salesData);

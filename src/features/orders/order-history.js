@@ -106,7 +106,8 @@ export function renderOrderHistory(content) {
               : null,
           ]),
           h('div', { class: 'list-item__subtitle' }, [
-            `${formatDate(o.createdAt)} · Taken by ${o.cashierName} · ${o.itemCount} items`,
+            `${formatDate(o.createdAt)} · Taken by ${o.cashierName} · ${o.itemCount} items` +
+              (o.paid && o.paidAt ? ` · Paid ${formatDate(o.paidAt, 'hh:mm a')}` : ''),
           ]),
         ]),
         h('div', { class: 'list-item__trailing' }, [formatMoney(o.total)]),

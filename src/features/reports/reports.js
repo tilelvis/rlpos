@@ -481,6 +481,7 @@ function drawReceiptsTab(body) {
         ]),
         h('div', { class: 'list-item__subtitle' }, [
           `${formatDate(r.issuedAt, 'dd/MM/yyyy hh:mm a')} · ${r.cashierName}` +
+            (order?.paid && order?.paidAt ? ` · Paid ${formatDate(order.paidAt, 'dd/MM/yyyy hh:mm a')}` : '') +
             (r.reprintCount > 0 ? ` · Reprinted ×${r.reprintCount}` : ''),
         ]),
       ]),

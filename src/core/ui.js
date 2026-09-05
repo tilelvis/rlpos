@@ -204,6 +204,7 @@ export function formatDate(d, pattern = 'dd/MM hh:mm a') {
   if (pattern === 'dd/MM/yyyy hh:mm a') return `${dd}/${mm}/${yyyy} ${String(h).padStart(2, '0')}:${MM} ${ampm}`;
   if (pattern === 'dd/MM/yyyy') return `${dd}/${mm}/${yyyy}`;
   if (pattern === 'HH:mm') return `${HH}:${MM}`;
+  if (pattern === 'hh:mm a') return `${String(h).padStart(2, '0')}:${MM} ${ampm}`;
   if (pattern === 'MM-yyyy') return `${mm}-${yyyy}`;
   return dt.toLocaleString();
 }

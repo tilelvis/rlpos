@@ -100,7 +100,8 @@ export function showOrderModal(order) {
 
   return showOrderItemsModal({
     heading: order.orderNumber,
-    subtitle: `${formatDate(order.createdAt)} · Taken by ${order.cashierName}`,
+    subtitle: `${formatDate(order.createdAt)} · Taken by ${order.cashierName}` +
+      (order.paid && order.paidAt ? ` · Paid ${formatDate(order.paidAt, 'hh:mm a')}` : ''),
     items: order.items,
     total: order.total,
     badges,
@@ -127,7 +128,8 @@ export function showReceiptModal(receipt) {
   }
   return showOrderItemsModal({
     heading: `#${receipt.receiptNumber}`,
-    subtitle: `${formatDate(receipt.issuedAt, 'dd/MM/yyyy hh:mm a')} · Cashier: ${receipt.cashierName}`,
+    subtitle: `${formatDate(receipt.issuedAt, 'dd/MM/yyyy hh:mm a')} · Cashier: ${receipt.cashierName}` +
+      (order?.paid && order?.paidAt ? ` · Paid ${formatDate(order.paidAt, 'dd/MM/yyyy hh:mm a')}` : ''),
     items: receipt.lineItems,
     total: receipt.total,
     badges,

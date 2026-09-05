@@ -215,9 +215,10 @@ export function openConfirmPaymentModal(order, user, onConfirmed) {
         // the orders store bump triggers a dashboard re-render.
         setTimeout(async () => {
           try {
-            await OrdersProvider.markPaid(orderId, user, { paymentType });
+            const updated = await OrdersProvider.markPaid(orderId, user, { paymentType });
             const payLabel = paymentType === 'mpesa' ? 'M-Pesa' : 'Cash';
-            toast(`Confirmed ${orderNum} as paid via ${payLabel}.`, { type: 'success' });
+            const timeLabel = updated?.paidAt ? formatDate(updated.paidAt, 'hh:mm a') : '';
+            toast(`Confirmed ${orderNum} as paid via ${payLabel}${timeLabel ? ` at ${timeLabel}` : ''}.`, { type: 'success' });
             if (cb) cb();
           } catch (e) {
             toast(`Failed: ${e.message}`, { type: 'error' });
